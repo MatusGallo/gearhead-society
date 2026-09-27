@@ -1,0 +1,596 @@
+---
+/**
+ * Ticket order: the wave on sale, how many, name and e-mail, the two confirmations (18+, terms), then a confirmation
+ * screen with the order number and what happens next. The order goes to `site.orders.endpoint` as JSON when it is
+ * set, otherwise out as a prefilled e-mail. Without JavaScript the form itself is a mailto form.
+ * With `ticketUrl` set the page just points to the shop; with no wave on sale it shows the waves and when to come back.
+ */
+import Layout from "../../../../layouts/Layout.astro";
+import ContentRail from "../../../../components/ContentRail.astro";
+import Icon from "../../../../components/Icon.astro";
+import TicketWaves from "../../../../components/TicketWaves.astro";
+import { currentWave, events, formatDate, formatNumeric, formatPrice, formatTime, isUpcoming, type EventItem } from "../../../../data/events";
+import { site } from "../../../../data/site";
+import { href, langs, translator, ui, type Lang } from "../../../../i18n";
+
+export function getStaticPaths() {
+  return langs.flatMap((lang) => events.filter((e) => e.tickets.length).map((event) => ({ params: { lang, slug: event.slug }, props: { event } })));
+}
+
+const lang = Astro.params.lang as Lang;
+const t = translator(lang);
+const { event } = Astro.props as { event: EventItem };
+const wave = isUpcoming(event) ? currentWave(event) : undefined;
+const open = !!wave && wave.price != null && !event.ticketUrl;
+const { endpoint, maxPerOrder, payDays } = site.orders;
+const eventHref = href(lang, `/events/${event.slug}`);
+const when = event.start ? `${formatNumeric(event.start, lang)} ${formatTime(event.start)}` : ui.dateTba[lang];
+const where = `${event.venue[lang]}, ${event.city[lang]}`;
+
+const steps = [
+  t({ cs: "Vstupenky", en: "Tickets" }),
+  t({ cs: "Údaje", en: "Details" }),
+  t({ cs: "Potvrzení", en: "Confirmation" }),
+];
+
+// What happens after the order, shown on the confirmation screen
+const next = [
+  {
+    icon: "envelope-simple",
+    head: t({ cs: "Potvrzení a platba", en: "Confirmation and payment" }),
+    text: t({
+      cs: "Do 2 pracovních dnů ti pošleme e-mail s platebními údaji. Jako variabilní symbol uveď číslo objednávky.",
+      en: "Within 2 working days we e-mail you the payment details. Use the order number as the payment reference.",
+    }),
+  },
+  {
+    icon: "clock",
+    head: t({ cs: `Zaplať do ${payDays} dnů`, en: `Pay within ${payDays} days` }),
+    text: t({
+      cs: "Do té doby ti vstupenky držíme za cenu téhle vlny. Nezaplacená rezervace pak propadne.",
+      en: "Until then we hold your tickets at this wave's price. After that an unpaid reservation lapses.",
+    }),
+  },
+  {
+    icon: "ticket",
+    head: t({ cs: "Vstupenka na jméno", en: "Ticket in your name" }),
+    text: t({ cs: "Po zaplacení ti vstupenka přijde e-mailem. Stačí ji ukázat v telefonu.", en: "Once paid, the ticket arrives by e-mail. Show it on your phone." }),
+  },
+  {
+    icon: "identification-card",
+    head: t({ cs: "U vstupu", en: "At the door" }),
+    text: t({ cs: "Vstupenka, doklad s fotkou a dress code. Bez dokladu nepustíme nikoho.", en: "Ticket, photo ID and the dress code. No ID, no entry, for anyone." }),
+  },
+];
+
+// Copy the script needs, in the page language
+const copy = {
+  subject: `${ui.tickets[lang]}: ${event.title}`,
+  lines: {
+    ref: t({ cs: "Objednávka", en: "Order" }),
+    event: t({ cs: "Akce", en: "Event" }),
+    wave: t({ cs: "Vlna", en: "Wave" }),
+    qty: t({ cs: "Počet", en: "Quantity" }),
+    total: t({ cs: "Celkem", en: "Total" }),
+    name: t({ cs: "Jméno", en: "Name" }),
+    email: "E-mail",
+    note: t({ cs: "Poznámka", en: "Note" }),
+    agree: t({ cs: "Potvrzuji 18+ a souhlasím s obchodními podmínkami.", en: "I confirm I am 18+ and accept the terms of sale." }),
+  },
+  errors: {
+    name: t({ cs: "Napiš jméno a příjmení, jak je máš na dokladu.", en: "Enter your full name as it appears on your ID." }),
+    email: t({ cs: "Zkontroluj e-mail, sem ti pošleme vstupenku.", en: "Check the e-mail address, your ticket goes there." }),
+    age: t({ cs: "Vstup je jen od 18 let.", en: "Entry is 18+ only." }),
+    terms: t({ cs: "Bez souhlasu s podmínkami objednávku nepřijmeme.", en: "We need you to accept the terms to take the order." }),
+  },
+};
+
+const field = "field mt-2 block w-full";
+---
+
+<Layout lang={lang} title={`${ui.tickets[lang]}: ${event.title}`} description={event.summary[lang]}>
+  <section class="relative overflow-hidden border-b border-line pt-15">
+    <div class="hero-in mx-auto max-w-[1400px] px-4 pt-12 pb-10 sm:px-6 sm:pt-16 lg:pl-24">
+      <a href={eventHref} class="mono inline-flex min-h-11 items-center gap-2 text-xs text-mute hover:text-acid"><Icon name="arrow-left" /> {event.title}</a>
+      <h1 class="display mt-4 text-[clamp(2.5rem,7vw,5rem)]" style="--i:1">{ui.tickets[lang]}</h1>
+      <p class="mono mt-4 flex flex-wrap gap-x-5 gap-y-1 text-xs text-bone/80 sm:text-sm" style="--i:2">
+        <span class="text-acid">{event.title}</span><span>{when}</span><span>{where}</span>
+      </p>
+      {
+        open && (
+          <ol class="mono mt-8 grid max-w-xl grid-cols-3 gap-1 text-[0.65rem] sm:text-xs" style="--i:3" data-steps>
+            {steps.map((s, i) => (
+              <li class="step" data-step={i}>
+                <span class="step-bar block h-1" aria-hidden="true" />
+                <span class="mt-2 flex gap-2"><span>{String(i + 1).padStart(2, "0")}</span>{s}</span>
+              </li>
+            ))}
+          </ol>
+        )
+      }
+    </div>
+  </section>
+
+  <section class="relative mx-auto max-w-[1400px] px-4 py-14 sm:px-6 lg:pl-24">
+    <ContentRail label={ui.tickets[lang]} lines={[event.title, where]} />
+    {
+      event.ticketUrl && wave ? (
+        <div class="max-w-xl border border-line p-6">
+          <p class="text-lg">{t({ cs: "Vstupenky na tuhle akci prodáváme přes náš předprodej.", en: "Tickets for this event are sold through our ticket shop." })}</p>
+          <a href={event.ticketUrl} target="_blank" rel="noopener" class="btn btn-acid mt-6 w-full justify-between">
+            {ui.buyTickets[lang]} <Icon name="arrow-up-right" />
+          </a>
+        </div>
+      ) : !open ? (
+        <div class="max-w-2xl">
+          <p class="display text-3xl">
+            {!isUpcoming(event) ? t({ cs: "Akce už proběhla", en: "This event is over" }) : t({ cs: "Prodej teď neběží", en: "No tickets on sale right now" })}
+          </p>
+          <p class="mt-4 max-w-[55ch] leading-relaxed text-bone/75">
+            {!isUpcoming(event)
+              ? t({ cs: "Mrkni na další termíny, nebo na fotky z téhle noci.", en: "Check the next dates, or the photos from this night." })
+              : t({ cs: "Další vlnu ohlásíme na Instagramu a Discordu. Nejlevněji koupíš hned v early bird.", en: "We announce the next wave on Instagram and Discord. Early bird is always the cheapest." })}
+          </p>
+          <TicketWaves event={event} lang={lang} class="mt-10" />
+          <div class="mt-10 flex flex-wrap gap-3">
+            <a href={href(lang, "/events")} class="btn btn-acid">{ui.allEvents[lang]} <Icon name="arrow-right" /></a>
+            <a href={eventHref} class="btn btn-ghost">{ui.eventInfo[lang]}</a>
+          </div>
+        </div>
+      ) : (
+        <div
+          class="grid gap-12 lg:grid-cols-[minmax(0,1fr)_24rem] lg:gap-16"
+          data-order
+          data-endpoint={endpoint}
+          data-email={site.email}
+          data-event={event.slug}
+          data-title={event.title}
+          data-when={when}
+          data-wave={wave!.name[lang]}
+          data-price={wave!.price}
+          data-lang={lang}
+          data-copy={JSON.stringify(copy)}
+        >
+          <!-- ORDER FORM; the confirmation replaces it in place -->
+          <div class="min-w-0">
+            <form
+              class="max-w-2xl"
+              action={`mailto:${site.email}?subject=${encodeURIComponent(copy.subject)}`}
+              method="post"
+              enctype="text/plain"
+              novalidate
+              data-order-form
+            >
+              <fieldset class="border-t border-line pt-8">
+                <legend class="mono float-left flex w-full items-center gap-3 text-xs text-mute"><span class="text-acid">01</span> {steps[0]}</legend>
+                <div class="clear-both flex flex-wrap items-end justify-between gap-6 pt-6">
+                  <div>
+                    <p class="display text-2xl text-acid">{wave!.name[lang]}</p>
+                    <p class="mono mt-2 text-xs text-mute">
+                      {formatPrice(wave!.price)} / {t({ cs: "osoba", en: "person" })}
+                      {wave!.until && <> · {t({ cs: `do ${formatNumeric(wave!.until, lang)}`, en: `until ${formatNumeric(wave!.until, lang)}` })}</>}
+                    </p>
+                    {wave!.note && <p class="mt-1 text-xs text-mute">{wave!.note[lang]}</p>}
+                  </div>
+                  <div class="flex items-stretch border border-line" role="group" aria-labelledby="qty-label">
+                    <span id="qty-label" class="sr-only">{copy.lines.qty}</span>
+                    <button type="button" class="grid size-12 place-items-center hover:text-acid disabled:opacity-30" data-qty="-1" aria-label={t({ cs: "Ubrat", en: "Fewer" })}><Icon name="minus" /></button>
+                    <input
+                      type="number"
+                      name="qty"
+                      value="1"
+                      min="1"
+                      max={maxPerOrder}
+                      inputmode="numeric"
+                      class="mono w-14 border-x border-line bg-transparent text-center text-lg tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                      aria-labelledby="qty-label"
+                    />
+                    <button type="button" class="grid size-12 place-items-center hover:text-acid disabled:opacity-30" data-qty="1" aria-label={t({ cs: "Přidat", en: "More" })}><Icon name="plus" /></button>
+                  </div>
+                </div>
+                <p class="mono mt-3 text-[0.65rem] text-mute">{t({ cs: `Max. ${maxPerOrder} vstupenky na objednávku. Každý host musí mít vlastní doklad.`, en: `Up to ${maxPerOrder} tickets per order. Every guest needs their own ID.` })}</p>
+              </fieldset>
+
+              <fieldset class="mt-12 border-t border-line pt-8">
+                <legend class="mono float-left flex w-full items-center gap-3 text-xs text-mute"><span class="text-acid">02</span> {steps[1]}</legend>
+                <div class="clear-both grid gap-6 pt-6 sm:grid-cols-2">
+                  <label class="block sm:col-span-2">
+                    <span class="mono text-xs">{t({ cs: "Jméno a příjmení", en: "Full name" })}</span>
+                    <input type="text" name="name" required minlength="3" autocomplete="name" class={field} aria-describedby="name-hint name-error" />
+                    <span id="name-hint" class="mt-1.5 block text-xs text-mute">{t({ cs: "Jak ho máš na dokladu. Vstupenka je na jméno.", en: "As on your ID. The ticket is issued in your name." })}</span>
+                    <span id="name-error" class="field-error" data-error="name" />
+                  </label>
+                  <label class="block sm:col-span-2">
+                    <span class="mono text-xs">E-mail</span>
+                    <input type="email" name="email" required autocomplete="email" spellcheck="false" class={field} aria-describedby="email-error" />
+                    <span id="email-error" class="field-error" data-error="email" />
+                  </label>
+                  <label class="block sm:col-span-2">
+                    <span class="mono text-xs">{copy.lines.note} <span class="text-mute">({t({ cs: "nepovinné", en: "optional" })})</span></span>
+                    <textarea name="note" rows="3" maxlength="500" class={`${field} py-3`} placeholder={t({ cs: "Jména dalších hostů, fakturační údaje, dotaz", en: "Other guests' names, invoice details, a question" })} />
+                  </label>
+                </div>
+              </fieldset>
+
+              <fieldset class="mt-12 border-t border-line pt-8">
+                <legend class="mono float-left flex w-full items-center gap-3 text-xs text-mute"><span class="text-acid">03</span> {steps[2]}</legend>
+                <div class="clear-both space-y-4 pt-6">
+                  <label class="flex items-start gap-3">
+                    <input type="checkbox" name="age" required class="tick mt-0.5" aria-describedby="age-error" />
+                    <span class="text-sm leading-relaxed">
+                      {t({ cs: "Je mi 18 let a u vstupu ukážu doklad s fotkou.", en: "I am 18 or older and will show photo ID at the door." })}
+                      <span id="age-error" class="field-error" data-error="age" />
+                    </span>
+                  </label>
+                  <label class="flex items-start gap-3">
+                    <input type="checkbox" name="terms" required class="tick mt-0.5" aria-describedby="terms-error" />
+                    <span class="text-sm leading-relaxed">
+                      {t({ cs: "Souhlasím s ", en: "I accept the " })}
+                      <a href={href(lang, "/terms")} target="_blank" class="text-acid underline underline-offset-4 hover:text-bone">{t({ cs: "obchodními podmínkami", en: "terms of sale" })}</a>
+                      {t({ cs: " a ", en: " and the " })}
+                      <a href={href(lang, "/code-of-conduct")} target="_blank" class="text-acid underline underline-offset-4 hover:text-bone">{t({ cs: "pravidly chování", en: "code of conduct" })}</a>.
+                      {t({ cs: " Vstupenky na akce s pevným datem nelze vrátit bez udání důvodu.", en: " Tickets for events on a fixed date cannot be returned without a reason." })}
+                      <span id="terms-error" class="field-error" data-error="terms" />
+                    </span>
+                  </label>
+                  <p class="text-xs leading-relaxed text-mute">
+                    {t({ cs: "Jméno a e-mail použijeme jen k vyřízení objednávky a vstupu. ", en: "We use your name and e-mail only to handle the order and your entry. " })}
+                    <a href={href(lang, "/privacy")} class="underline underline-offset-4 hover:text-acid">{ui.footer.privacy[lang]}</a>
+                  </p>
+                </div>
+              </fieldset>
+
+              <button type="submit" class="btn btn-acid mt-10 w-full justify-between disabled:cursor-progress disabled:opacity-70" data-submit>
+                <span data-submit-idle>{t({ cs: "Odeslat objednávku", en: "Place order" })}</span>
+                <span class="hidden" data-submit-busy>{t({ cs: "Odesílám", en: "Sending" })}</span>
+                <span class="mono tabular-nums" data-total-btn>{formatPrice(wave!.price)}</span>
+              </button>
+              <p class="mt-3 text-xs text-mute">
+                {endpoint
+                  ? t({ cs: "Odesláním objednávky zatím nic neplatíš. Platební údaje ti pošleme e-mailem.", en: "Placing the order does not charge you. We e-mail you the payment details." })
+                  : t({ cs: "Otevře se ti e-mail s hotovou objednávkou, stačí ho odeslat. Zatím nic neplatíš.", en: "Your mail app opens with the order filled in, just send it. Nothing is charged yet." })}
+              </p>
+              <p class="field-error mt-4" role="alert" data-error="send" />
+            </form>
+
+            <!-- CONFIRMATION -->
+            <div class="max-w-2xl scroll-mt-24 outline-none" hidden tabindex="-1" data-order-done>
+              <div class="stamp border border-acid">
+                <p class="mono flex items-center justify-between gap-4 bg-acid px-5 py-2 text-xs text-ink">
+                  <span class="flex items-center gap-2"><Icon name="check-circle" class="size-4" /> <span data-done-state /></span>
+                  <span class="tabular-nums" data-done-ref />
+                </p>
+                <div class="p-5 sm:p-6">
+                  <p class="display text-3xl sm:text-4xl" data-done-title />
+                  <p class="mt-3 leading-relaxed text-bone/80" data-done-text />
+                  <div class="mt-5 hidden flex-wrap gap-3" data-done-mail>
+                    <a href="#" class="btn btn-acid" data-done-mailto>{t({ cs: "Otevřít e-mail znovu", en: "Open the e-mail again" })} <Icon name="envelope-simple" /></a>
+                    <button type="button" class="btn btn-ghost" data-done-copy data-done-copied={ui.copy.done[lang]}>{t({ cs: "Zkopírovat objednávku", en: "Copy the order" })} <Icon name="copy" /></button>
+                  </div>
+                  <pre class="mono mt-5 hidden overflow-x-auto border border-line bg-ink p-4 text-xs leading-relaxed whitespace-pre-wrap text-bone/80 normal-case" data-done-body />
+                </div>
+              </div>
+              <h2 class="mono mt-12 text-xs text-mute">{t({ cs: "Co bude dál", en: "What happens next" })}</h2>
+              <ol class="mt-4 border-t border-line">
+                {next.map((n, i) => (
+                  <li class="grid grid-cols-[2.5rem_1fr] gap-4 border-b border-line py-5">
+                    <span class="mono text-acid">{String(i + 1).padStart(2, "0")}</span>
+                    <div>
+                      <p class="mono flex items-center gap-2 text-sm"><Icon name={n.icon} class="size-4 text-acid" /> {n.head}</p>
+                      <p class="mt-2 text-sm leading-relaxed text-bone/75">{n.text}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+              <div class="mt-10 flex flex-wrap gap-3">
+                <a href={eventHref} class="btn btn-ghost"><Icon name="arrow-left" /> {event.title}</a>
+                <a href={href(lang, "/contact")} class="btn btn-ghost">{ui.nav.contact[lang]}</a>
+              </div>
+            </div>
+          </div>
+
+          <!-- SUMMARY: the order as a ticket stub, live with the quantity -->
+          <aside class="lg:sticky lg:top-24 lg:self-start" aria-label={t({ cs: "Souhrn objednávky", en: "Order summary" })}>
+            <div class="relative">
+              <span class="frame frame-on absolute inset-0" aria-hidden="true" />
+              <p class="mono flex items-center justify-between gap-4 bg-acid px-4 py-2 text-xs text-ink">
+                <span class="flex items-center gap-2"><Icon name="receipt" class="size-4" /> {t({ cs: "Souhrn", en: "Summary" })}</span>
+                <span class="tabular-nums">{event.start ? formatNumeric(event.start, lang) : "TBA"}</span>
+              </p>
+              <div class="grid grid-cols-[2.75rem_1fr] border-x border-b border-line bg-coal">
+                <span class="flex items-center justify-center bg-violet py-4">
+                  <span class="rail display text-xs whitespace-nowrap text-acid">{event.edition[lang]}</span>
+                </span>
+                <div class="min-w-0">
+                  <div class="p-5">
+                    <p class="display text-3xl leading-[0.95]">{event.title}</p>
+                    <p class="mono mt-3 text-xs text-mute">{formatDate(event.start, lang)}, {formatTime(event.start)}</p>
+                    <p class="mono mt-1 text-xs text-mute">{where}</p>
+                  </div>
+                  <dl class="mono border-t border-dashed border-line px-5 py-4 text-xs">
+                    <div class="flex justify-between gap-4 py-1">
+                      <dt class="text-mute">{wave!.name[lang]}</dt>
+                      <dd class="tabular-nums"><span data-qty-out>1</span> × {formatPrice(wave!.price)}</dd>
+                    </div>
+                  </dl>
+                  <div class="flex items-baseline justify-between gap-4 border-t border-line px-5 py-4">
+                    <span class="mono text-xs text-mute">{copy.lines.total}</span>
+                    <span class="display text-2xl text-acid tabular-nums" data-total aria-live="polite">{formatPrice(wave!.price)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <ul class="mono mt-5 space-y-2 text-[0.7rem] leading-relaxed text-mute">
+              <li class="flex gap-2"><Icon name="identification-card" class="mt-0.5 size-3.5 text-acid" /> {ui.footer.adults[lang]}</li>
+              <li class="flex gap-2"><Icon name="t-shirt" class="mt-0.5 size-3.5 text-acid" /> {t({ cs: "Dress code se kontroluje u vstupu", en: "Dress code checked at the door" })}</li>
+              <li class="flex gap-2"><Icon name="envelope-simple" class="mt-0.5 size-3.5 text-acid" /> {t({ cs: "Platební údaje pošleme e-mailem", en: "Payment details follow by e-mail" })}</li>
+            </ul>
+          </aside>
+        </div>
+      )
+    }
+  </section>
+</Layout>
+
+<style>
+  /* Progress rail: done steps solid accent, the live one pulses its bar, later ones outline */
+  .step { color: var(--color-mute); }
+  .step-bar { border: 1px solid var(--color-line); }
+  .step[data-state="done"],
+  .step[data-state="live"] { color: var(--color-acid); }
+  .step[data-state="done"] .step-bar { background: var(--color-acid); border-color: var(--color-acid); }
+  .step[data-state="live"] .step-bar {
+    border-color: var(--color-acid);
+    background: linear-gradient(to right, var(--color-acid) 50%, transparent 50%) left / 200% 100%;
+  }
+
+  .field {
+    min-height: 3.25rem;
+    padding: 0 1rem;
+    border: 1px solid var(--color-line);
+    background: var(--color-ink);
+    color: var(--color-bone);
+    transition: border-color 0.25s var(--ease-out-expo);
+  }
+  .field:hover { border-color: color-mix(in oklab, var(--color-bone) 35%, transparent); }
+  .field:focus { outline: none; border-color: var(--color-acid); }
+  .field::placeholder { color: color-mix(in oklab, var(--color-mute) 70%, transparent); }
+  .field[aria-invalid="true"] { border-color: var(--color-signal); }
+
+  .field-error {
+    display: block;
+    margin-top: 0.4rem;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-signal);
+  }
+  .field-error:empty { display: none; }
+
+  /* Square check box, accent fill with an ink tick */
+  .tick {
+    appearance: none;
+    position: relative;
+    flex-shrink: 0;
+    width: 1.35rem;
+    height: 1.35rem;
+    border: 1px solid var(--color-bone);
+    background: var(--color-ink);
+  }
+  .tick:checked { background: var(--color-acid); border-color: var(--color-acid); }
+  .tick:checked::after {
+    content: "";
+    position: absolute;
+    left: 0.42rem;
+    top: 0.14rem;
+    width: 0.4rem;
+    height: 0.75rem;
+    border: solid var(--color-ink);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+  .tick[aria-invalid="true"] { border-color: var(--color-signal); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .step[data-state="live"] .step-bar { animation: step-fill 1.6s var(--ease-out-expo) infinite alternate; }
+    /* The confirmation lands like a stamp: a hair large, then pressed flat */
+    [data-order-done]:not([hidden]) .stamp { animation: stamp 0.55s var(--ease-out-expo) both; }
+  }
+  @keyframes step-fill {
+    from { background-position: 100% 0; }
+    to { background-position: 0 0; }
+  }
+  @keyframes stamp {
+    from { opacity: 0; transform: scale(1.04); }
+    to { opacity: 1; transform: none; }
+  }
+</style>
+
+<script>
+  type Copy = {
+    subject: string;
+    lines: Record<"ref" | "event" | "wave" | "qty" | "total" | "name" | "email" | "note" | "agree", string>;
+    errors: Record<"name" | "email" | "age" | "terms", string>;
+  };
+
+  const root = document.querySelector<HTMLElement>("[data-order]");
+  if (root) {
+    const d = root.dataset;
+    const copy = JSON.parse(d.copy!) as Copy;
+    const cs = d.lang === "cs";
+    const price = Number(d.price);
+    const form = root.querySelector<HTMLFormElement>("[data-order-form]")!;
+    const done = root.querySelector<HTMLElement>("[data-order-done]")!;
+    const qty = form.elements.namedItem("qty") as HTMLInputElement;
+    const max = Number(qty.max);
+    const $ = <T extends HTMLElement = HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
+    const money = (n: number) => `${n.toLocaleString("cs-CZ")} CZK`;
+    const steps = [...document.querySelectorAll<HTMLElement>("[data-steps] [data-step]")];
+
+    const setStep = (n: number) => steps.forEach((s, i) => (s.dataset.state = i < n ? "done" : i === n ? "live" : "next"));
+    setStep(0);
+
+    // Quantity stepper and the live total
+    const sync = () => {
+      const n = Math.min(max, Math.max(1, Math.round(Number(qty.value) || 1)));
+      qty.value = String(n);
+      $("[data-qty-out]").textContent = String(n);
+      $("[data-total]").textContent = $("[data-total-btn]").textContent = money(n * price);
+      form.querySelector<HTMLButtonElement>('[data-qty="-1"]')!.disabled = n <= 1;
+      form.querySelector<HTMLButtonElement>('[data-qty="1"]')!.disabled = n >= max;
+      return n;
+    };
+    form.querySelectorAll<HTMLButtonElement>("[data-qty]").forEach((b) =>
+      b.addEventListener("click", () => {
+        qty.value = String(Number(qty.value) + Number(b.dataset.qty));
+        sync();
+      }),
+    );
+    qty.addEventListener("change", sync);
+    sync();
+
+    // Step rail follows where the visitor is in the form
+    form.addEventListener("focusin", (e) => {
+      const fs = (e.target as HTMLElement).closest("fieldset");
+      const i = [...form.querySelectorAll("fieldset")].indexOf(fs!);
+      if (i >= 0) setStep(i);
+    });
+
+    // Validation: one message per field, shown after the first submit and cleared as it is fixed
+    const checks: [keyof Copy["errors"], () => boolean][] = [
+      ["name", () => (form.elements.namedItem("name") as HTMLInputElement).value.trim().length >= 3],
+      ["email", () => (form.elements.namedItem("email") as HTMLInputElement).validity.valid],
+      ["age", () => (form.elements.namedItem("age") as HTMLInputElement).checked],
+      ["terms", () => (form.elements.namedItem("terms") as HTMLInputElement).checked],
+    ];
+    let tried = false;
+    const validate = () => {
+      let first: HTMLInputElement | undefined;
+      for (const [key, ok] of checks) {
+        const input = form.elements.namedItem(key) as HTMLInputElement;
+        const bad = !ok();
+        input.setAttribute("aria-invalid", String(bad));
+        $(`[data-error="${key}"]`).textContent = bad ? copy.errors[key] : "";
+        if (bad && !first) first = input;
+      }
+      return first;
+    };
+    form.addEventListener("input", () => tried && validate());
+    form.addEventListener("change", () => tried && validate());
+
+    // Order number, numeric so it works as the bank's variable symbol
+    const makeRef = () => {
+      const a = new Uint32Array(1);
+      crypto.getRandomValues(a);
+      return String(10000000 + (a[0] % 90000000));
+    };
+
+    const busy = (on: boolean) => {
+      $<HTMLButtonElement>("[data-submit]").disabled = on;
+      $("[data-submit-idle]").classList.toggle("hidden", on);
+      $("[data-submit-busy]").classList.toggle("hidden", !on);
+    };
+
+    const finish = (ref: string, mail?: { href: string; body: string }) => {
+      form.hidden = true;
+      done.hidden = false;
+      setStep(3);
+      $("[data-done-ref]").textContent = `#${ref}`;
+      $("[data-done-state]").textContent = mail ? (cs ? "Připraveno k odeslání" : "Ready to send") : cs ? "Přijato" : "Received";
+      $("[data-done-title]").textContent = mail ? (cs ? "Odešli e-mail" : "Send the e-mail") : cs ? "Objednávka přijata" : "Order received";
+      $("[data-done-text]").textContent = mail
+        ? cs
+          ? `Otevřeli jsme ti e-mail s objednávkou. Objednávku máme, až ho odešleš. Neotevřel se? Pošli text níže na ${d.email}.`
+          : `We opened an e-mail with your order. We have it once you send it. Nothing opened? Send the text below to ${d.email}.`
+        : cs
+          ? "Díky. Potvrzení s platebními údaji ti přijde e-mailem."
+          : "Thanks. A confirmation with the payment details is on its way to your inbox.";
+      if (mail) {
+        $("[data-done-mail]").classList.replace("hidden", "flex");
+        $<HTMLAnchorElement>("[data-done-mailto]").href = mail.href;
+        const pre = $("[data-done-body]");
+        pre.textContent = mail.body;
+        pre.classList.remove("hidden");
+        const btn = $<HTMLButtonElement>("[data-done-copy]");
+        btn.addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(mail.body);
+            btn.firstChild!.textContent = `${btn.dataset.doneCopied} `;
+          } catch {
+            getSelection()?.selectAllChildren(pre);
+          }
+        });
+      }
+      done.focus();
+      done.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    };
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      tried = true;
+      const bad = validate();
+      if (bad) return bad.focus();
+
+      const n = sync();
+      const v = (k: string) => ((form.elements.namedItem(k) as HTMLInputElement).value || "").trim();
+      const ref = makeRef();
+      const order = {
+        ref,
+        event: d.event,
+        title: d.title,
+        when: d.when,
+        wave: d.wave,
+        unitPrice: price,
+        qty: n,
+        total: n * price,
+        currency: "CZK",
+        name: v("name"),
+        email: v("email"),
+        note: v("note"),
+        lang: d.lang,
+        acceptedTerms: true,
+        confirmedAdult: true,
+      };
+      const L = copy.lines;
+      const body = [
+        `${L.ref}: ${ref}`,
+        `${L.event}: ${d.title}, ${d.when}`,
+        `${L.wave}: ${d.wave}, ${money(price)}`,
+        `${L.qty}: ${n}`,
+        `${L.total}: ${money(n * price)}`,
+        "",
+        `${L.name}: ${order.name}`,
+        `${L.email}: ${order.email}`,
+        ...(order.note ? [`${L.note}: ${order.note}`] : []),
+        "",
+        L.agree,
+      ].join("\n");
+
+      if (d.endpoint) {
+        busy(true);
+        $('[data-error="send"]').textContent = "";
+        try {
+          const res = await fetch(d.endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify(order),
+          });
+          if (!res.ok) throw new Error(String(res.status));
+          finish(ref);
+        } catch {
+          $('[data-error="send"]').textContent = cs
+            ? `Objednávku se nepodařilo odeslat. Zkus to znovu, nebo nám napiš na ${d.email}.`
+            : `The order did not go through. Try again, or write to us at ${d.email}.`;
+        } finally {
+          busy(false);
+        }
+        return;
+      }
+
+      const href = `mailto:${d.email}?subject=${encodeURIComponent(`${copy.subject}, ${d.wave}, ${n}× [${ref}]`)}&body=${encodeURIComponent(body)}`;
+      location.href = href;
+      finish(ref, { href, body });
+    });
+  }
+</script>

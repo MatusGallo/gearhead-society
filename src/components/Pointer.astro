@@ -1,0 +1,38 @@
+---
+/**
+ * Feeds pointer position into CSS on every `[data-pointer]` element, for hero effects:
+ *   --x / --y    pointer in px inside the element (footer lens)
+ *   --px / --py  pointer from -1 to 1 around the centre (depth, map steering)
+ * `data-active` is set while the pointer is inside. Fine pointers only; one rAF per frame.
+ */
+---
+
+<script>
+  if (matchMedia("(pointer: fine)").matches) {
+    document.querySelectorAll<HTMLElement>("[data-pointer]").forEach((el) => {
+      let raf = 0;
+      let last: PointerEvent | null = null;
+      const apply = () => {
+        raf = 0;
+        if (!last) return;
+        const r = el.getBoundingClientRect();
+        const x = last.clientX - r.left;
+        const y = last.clientY - r.top;
+        el.style.setProperty("--x", `${x}px`);
+        el.style.setProperty("--y", `${y}px`);
+        el.style.setProperty("--px", ((x / r.width) * 2 - 1).toFixed(3));
+        el.style.setProperty("--py", ((y / r.height) * 2 - 1).toFixed(3));
+      };
+      el.addEventListener("pointermove", (e) => {
+        last = e;
+        raf ||= requestAnimationFrame(apply);
+      });
+      el.addEventListener("pointerenter", () => el.setAttribute("data-active", ""));
+      el.addEventListener("pointerleave", () => {
+        el.removeAttribute("data-active");
+        el.style.setProperty("--px", "0");
+        el.style.setProperty("--py", "0");
+      });
+    });
+  }
+</script>

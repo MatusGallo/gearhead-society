@@ -1,0 +1,56 @@
+---
+import "../styles/global.css";
+import Header from "../components/Header.astro";
+import Footer from "../components/Footer.astro";
+import CookieConsent from "../components/CookieConsent.astro";
+import { site } from "../data/site";
+import { langs, switchLang, ui, type Lang } from "../i18n";
+
+interface Props {
+  lang: Lang;
+  title?: string;
+  description?: string;
+  /** Section accent, see [data-theme] in global.css */
+  theme?: "sommers";
+  /** Keep the page out of search results (404) */
+  noindex?: boolean;
+}
+
+const { lang, title, description = site.description[lang], theme, noindex } = Astro.props;
+const fullTitle = title ? `${title} | ${site.name}` : `${site.name} | ${site.tagline[lang]}`;
+const path = Astro.url.pathname;
+const canonical = new URL(path, site.url).href;
+---
+
+<!doctype html>
+<html lang={lang} data-theme={theme}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#070707" />
+    {noindex && <meta name="robots" content="noindex" />}
+    <link rel="canonical" href={canonical} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={site.name} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:locale" content={lang === "cs" ? "cs_CZ" : "en_GB"} />
+    {langs.map((l) => <link rel="alternate" hreflang={l} href={new URL(switchLang(path, l), site.url).href} />)}
+    <link rel="alternate" hreflang="x-default" href={site.url + "/"} />
+    <meta name="twitter:card" content="summary" />
+    <slot name="head" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{fullTitle}</title>
+  </head>
+  <body>
+    <a href="#main" class="btn btn-acid sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[200]">{ui.skip[lang]}</a>
+    <Header lang={lang} theme={theme} />
+    <main id="main">
+      <slot />
+    </main>
+    <Footer lang={lang} />
+    <CookieConsent lang={lang} />
+  </body>
+</html>

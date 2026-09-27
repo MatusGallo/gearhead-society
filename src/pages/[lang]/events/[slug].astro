@@ -1,0 +1,228 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import ContentRail from "../../../components/ContentRail.astro";
+import Countdown from "../../../components/Countdown.astro";
+import Icon from "../../../components/Icon.astro";
+import ScanField from "../../../components/ScanField.astro";
+import HeroPlate from "../../../components/HeroPlate.astro";
+import HudRail from "../../../components/HudRail.astro";
+import { hudVariant } from "../../../data/hud";
+import { dissolve } from "../../../data/dissolve";
+import VenueMap from "../../../components/VenueMap.astro";
+import { events, formatDate, formatNumeric, formatPrice, formatTime, isUpcoming, ticketLink, ticketWaves, type EventItem } from "../../../data/events";
+import { href, langs, translator, ui, type Lang } from "../../../i18n";
+import { site } from "../../../data/site";
+
+export function getStaticPaths() {
+  return langs.flatMap((lang) => events.map((event) => ({ params: { lang, slug: event.slug }, props: { event } })));
+}
+
+const lang = Astro.params.lang as Lang;
+const t = translator(lang);
+const { event } = Astro.props as { event: EventItem };
+const upcoming = isUpcoming(event);
+const waves = ticketWaves(event);
+const currentWave = waves.find((w) => w.state === "current");
+const buy = ticketLink(event, lang);
+// Small line above the hero ticket label: the wave on sale and its price, or that sale has not opened
+const tixNote = currentWave
+  ? `${currentWave.name[lang]} ${formatPrice(currentWave.price)}`
+  : waves.length && !event.saleOpen
+    ? t({ cs: "Brzy v prodeji", en: "Coming soon" })
+    : undefined;
+
+// schema.org Event for search results: date, place, organiser and the waves as offers
+const pageUrl = new URL(Astro.url.pathname, site.url).href;
+const jsonLd = event.start && {
+  "@context": "https://schema.org",
+  "@type": "Event",
+  name: `${site.name}: ${event.title}`,
+  description: event.summary[lang],
+  startDate: event.start,
+  endDate: event.end,
+  eventStatus: "https://schema.org/EventScheduled",
+  eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+  location: {
+    "@type": "Place",
+    name: event.venue[lang],
+    address: event.location
+      ? { "@type": "PostalAddress", streetAddress: event.location.street, addressLocality: event.location.city[lang], addressCountry: "CZ" }
+      : event.city[lang],
+    ...(event.location && { geo: { "@type": "GeoCoordinates", latitude: event.location.coords[1], longitude: event.location.coords[0] } }),
+  },
+  organizer: { "@type": "Organization", name: site.name, url: site.url },
+  performer: event.lineup.map((name) => ({ "@type": "PerformingGroup", name })),
+  typicalAgeRange: "18-",
+  url: pageUrl,
+  offers: waves
+    .filter((w) => w.price != null)
+    .map((w) => ({
+      "@type": "Offer",
+      name: w.name[lang],
+      price: w.price,
+      priceCurrency: "CZK",
+      availability: w.state === "past" ? "https://schema.org/SoldOut" : w.state === "current" ? "https://schema.org/InStock" : "https://schema.org/PreOrder",
+      url: buy && !event.ticketUrl ? new URL(buy, site.url).href : event.ticketUrl ?? pageUrl,
+      ...(w.until && { validThrough: w.until }),
+    })),
+};
+
+const tixDots = `--dl:${dissolve(7, true)};--dr:${dissolve(19, false)}`;
+const facts = [
+  { icon: "calendar-blank", label: t({ cs: "Datum", en: "Date" }), value: formatDate(event.start, lang) },
+  { icon: "clock", label: t({ cs: "Čas", en: "Time" }), value: event.start ? `${formatTime(event.start)}-${formatTime(event.end)}` : "TBA" },
+  { icon: "map-pin", label: t({ cs: "Místo", en: "Venue" }), value: `${event.city[lang]}, ${event.venue[lang]}` },
+  { icon: "identification-card", label: t({ cs: "Vstup", en: "Entry" }), value: t({ cs: "18+, nutný doklad s fotkou", en: "18+, photo ID required" }) },
+];
+---
+
+<Layout lang={lang} title={event.title} description={event.summary[lang]}>
+  {jsonLd && <script slot="head" type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
+  <section class="relative flex min-h-[80dvh] flex-col justify-end overflow-hidden pt-32" data-pointer>
+    {
+      event.image ? (
+        <HeroPlate src={event.image} />
+      ) : (
+        <ScanField seed={event.seed} labels={ui.zones[lang]} pauseLabel={ui.pause[lang]} playLabel={ui.play[lang]} class="!absolute inset-0" />
+      )
+    }
+    <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink via-ink/40 to-transparent"></div>
+    {
+      event.start && (
+        <div class="absolute top-15 right-0 bottom-0 hidden border-l border-line bg-ink/60 px-2 text-acid md:block">
+          <HudRail
+            class="h-full !py-10"
+            variant={hudVariant(Astro.url.pathname)}
+            numbers={[formatNumeric(event.start, lang).slice(0, 2), formatNumeric(event.start, lang).slice(3, 5)]}
+            lines={[`${event.title} / ${event.edition[lang]}`, `${event.venue[lang]}, ${event.city[lang]}`]}
+          />
+        </div>
+      )
+    }
+    <div class="hero-in relative mx-auto w-full max-w-[1400px] px-4 pb-10 sm:px-6 md:pr-20">
+      <h1 class="title-in display text-[clamp(3rem,9vw,6rem)]" style="--i:1">{event.title}</h1>
+      <p class="mono mt-5 text-sm text-bone/85" style="--i:2">
+        {formatDate(event.start, lang)}, {event.city[lang]}. <span class="text-acid">{event.edition[lang]}</span>
+      </p>
+    </div>
+    {
+      upcoming && event.start && (
+        <div class="relative bg-acid text-ink">
+          <div class="hero-in mx-auto grid max-w-[1400px] gap-x-10 gap-y-3 px-4 pt-4 sm:px-6 md:grid-cols-[auto_1fr_auto] md:pt-0">
+            <div class="flex items-center gap-4 md:py-4" style="--i:3">
+              <p class="mono flex items-center gap-2 border-r border-ink/30 pr-4 text-xs"><span class="size-1.5 bg-ink" aria-hidden="true"></span>T-minus</p>
+              <Countdown target={event.start} labels={ui.countdown[lang]} strip />
+            </div>
+            <p class="mono flex flex-wrap items-center gap-x-5 gap-y-1 text-xs sm:text-sm" style="--i:4">
+              <span>{formatNumeric(event.start, lang)}</span>
+              <span>{formatTime(event.start)}</span>
+              <span>{event.venue[lang]}</span>
+            </p>
+            <!-- Violet ticket block with the label knocked out of an acid box, after the Marathon/Nightfall lockup -->
+            <a href="#tickets" class="tix relative -mx-4 flex items-center justify-between gap-5 bg-violet px-4 py-3 sm:-mx-6 sm:px-6 md:mx-0 md:px-5" style={`--i:5;${tixDots}`}>
+              <span class="grid gap-1.5">
+                {tixNote && <span class="display text-xs text-acid">{tixNote}</span>}
+                <span class="tix-box display bg-acid px-2 pt-1 pb-0.5 text-2xl leading-none text-violet sm:text-3xl">{ui.tickets[lang]}</span>
+              </span>
+              <Icon name="arrow-down" class="tix-arrow size-6 text-acid" />
+            </a>
+          </div>
+        </div>
+      )
+    }
+  </section>
+
+  <section class="relative mx-auto grid max-w-[1400px] gap-14 px-4 py-20 sm:px-6 lg:grid-cols-[1.4fr_1fr] lg:pl-24">
+    <ContentRail label={event.title} numbers={event.start ? [formatNumeric(event.start, lang).slice(0, 2), formatNumeric(event.start, lang).slice(3, 5)] : undefined} lines={[event.title, `${event.venue[lang]}, ${event.city[lang]}`]} />
+    <div>
+      <a href={href(lang, "/events")} class="mb-10 inline-flex min-h-11 items-center gap-2 text-sm text-mute hover:text-acid"><Icon name="arrow-left" /> {ui.allEvents[lang]}</a>
+      <p class="text-2xl leading-snug sm:text-3xl">{event.summary[lang]}</p>
+      <div class="mt-8 max-w-[65ch] space-y-5 leading-relaxed text-bone/75">
+        {event.description[lang].map((p) => <p>{p}</p>)}
+      </div>
+
+      <h2 class="display mt-16 text-3xl">Lineup</h2>
+      {
+        event.lineup.length ? (
+          <ul class="mt-6 border-t border-line">
+            {event.lineup.map((a) => <li class="display border-b border-line py-4 text-2xl text-bone/90 sm:text-3xl">{a}</li>)}
+          </ul>
+        ) : (
+          <p class="mono mt-6 border-t border-line pt-6 text-sm text-mute">{t({ cs: "Lineup oznámíme brzy.", en: "Lineup to be announced." })}</p>
+        )
+      }
+
+      <div class="mt-16 border border-line bg-coal p-6">
+        <p class="mono inline-flex items-center gap-2 text-sm text-acid"><Icon name="t-shirt" class="size-5" /> Dress code</p>
+        <p class="mt-2 text-lg">{event.dressCode[lang]}</p>
+      </div>
+    </div>
+
+    <aside class="space-y-8 lg:sticky lg:top-24 lg:self-start">
+      <dl class="grid gap-px overflow-hidden border border-line bg-line sm:grid-cols-2">
+        {
+          facts.map((f) => (
+            <div class="bg-ink p-5">
+              <dt class="mono flex items-center gap-2 text-xs text-mute"><Icon name={f.icon} class="size-4 text-acid" /> {f.label}</dt>
+              <dd class="mt-2 leading-snug">{f.value}</dd>
+            </div>
+          ))
+        }
+      </dl>
+
+      <div id="tickets" class="border border-line">
+        <p class="mono flex items-center gap-2 border-b border-line px-5 py-4 text-sm"><Icon name="ticket" class="size-5 text-acid" /> {ui.tickets[lang]}</p>
+        {
+          waves.length ? (
+            waves.map((w, i) => (
+              <div
+                class:list={[
+                  "flex items-center justify-between gap-4 border-b border-line px-5 py-4",
+                  w.state === "past" && "opacity-45",
+                  w.state === "current" && "bg-acid/10 shadow-[inset_2px_0_0_var(--color-acid)]",
+                ]}
+              >
+                <div>
+                  <p class:list={["display text-xl", w.state === "current" && "text-acid"]}>{w.name[lang]}</p>
+                  <p class="mono mt-1 text-xs text-mute">
+                    {w.state === "past"
+                      ? t({ cs: "Vyprodáno", en: "Sold out" })
+                      : w.state === "current"
+                        ? w.until
+                          ? t({ cs: `Teď v prodeji, do ${formatNumeric(w.until, lang)}`, en: `On sale now, until ${formatNumeric(w.until, lang)}` })
+                          : t({ cs: "Teď v prodeji", en: "On sale now" })
+                        : !event.saleOpen && i === 0
+                          ? t({ cs: "Brzy v prodeji", en: "Coming soon" })
+                          : w.rise
+                          ? t({ cs: `Další vlna, +${w.rise} CZK`, en: `Next wave, +${w.rise} CZK` })
+                          : t({ cs: "Další vlna", en: "Next wave" })}
+                  </p>
+                  {w.note && <p class="mt-1 text-xs text-mute">{w.note[lang]}</p>}
+                </div>
+                <span class:list={["mono text-lg", w.state === "past" && "line-through", w.state === "next" && "text-bone/60"]}>{formatPrice(w.price)}</span>
+              </div>
+            ))
+          ) : (
+            <p class="border-b border-line px-5 py-4 text-mute">{t({ cs: "Vstupenky oznámíme brzy.", en: "Tickets will be announced soon." })}</p>
+          )
+        }
+        {waves.length > 0 && <p class="mono border-b border-line px-5 py-3 text-xs text-mute">{t({ cs: "Cena roste s každou vlnou: early bird, classic, late runner.", en: "The price rises every wave: early bird, classic, late runner." })}</p>}
+        <div class="p-5">
+          {
+            buy && currentWave ? (
+              <a href={buy} {...(event.ticketUrl ? { target: "_blank", rel: "noopener" } : {})} class="btn btn-acid w-full justify-between">
+                <span>{ui.buyTickets[lang]}</span>
+                <span class="inline-flex items-center gap-2">{currentWave.name[lang]} {formatPrice(currentWave.price)} <Icon name={event.ticketUrl ? "arrow-up-right" : "arrow-right"} /></span>
+              </a>
+            ) : (
+              <span class="btn btn-ghost w-full cursor-not-allowed opacity-60">{ui.saleSoon[lang]}</span>
+            )
+          }
+        </div>
+      </div>
+    </aside>
+  </section>
+
+  {event.location && <VenueMap lang={lang} venue={event.venue[lang]} location={event.location} start={upcoming ? event.start : undefined} />}
+</Layout>
+

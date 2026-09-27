@@ -1,0 +1,76 @@
+---
+/**
+ * Edition mark: an acid tag ("Sraz / Nº") beside the meetup number set as odometer
+ * wheels, padded to three digits with the leading zeros dimmed, and a ruler of ten ticks
+ * that lights the last digit, then the town's GPS fix. Setkání without a number show their date instead.
+ * Sized in em, so the font size on `class` scales the whole mark.
+ */
+import { formatGps, type SommersEdition } from "../data/sommers";
+import type { Lang } from "../i18n";
+
+interface Props {
+  edition: SommersEdition;
+  lang: Lang;
+  class?: string;
+}
+
+const { edition: e, lang, class: cls = "" } = Astro.props;
+const tag = e.number ? (lang === "cs" ? "Sraz" : "Meetup") : lang === "cs" ? "Setkání" : "Get-together";
+const digits = e.number ? String(e.number).padStart(3, "0") : "";
+const lead = digits.length - String(e.number ?? "").length;
+const date = `${Number(e.start.slice(8, 10))}.${Number(e.start.slice(5, 7))}.`;
+const gps = e.gps && formatGps(e.gps);
+const lit = e.number ? e.number % 10 : Number(e.start.slice(8, 10)) % 10;
+---
+
+<span class:list={["edition-mark inline-grid grid-cols-[auto_auto_auto] items-stretch border border-acid text-acid", cls]}>
+  <span class="mono flex flex-col justify-between bg-acid px-[0.6em] py-[0.6em] text-[0.26em] leading-none text-ink">
+    <span>{tag}</span>
+    <span>{e.number ? "Nº" : `'${e.start.slice(2, 4)}`}</span>
+  </span>
+  <span class="grid gap-[0.12em] px-[0.25em] pt-[0.12em] pb-[0.14em]">
+    <span class="display roll flex leading-none" aria-label={e.number ? String(e.number) : date}>
+      {
+        e.number
+          ? [...digits].map((d, i) => (
+              <span class:list={["roll-wheel", i < lead && "text-acid/30"]} style={`--n:${d};--i:${i}`} aria-hidden="true">
+                <span class="roll-strip">{[...Array(10).keys()].map((k) => <span>{k}</span>)}</span>
+              </span>
+            ))
+          : <span aria-hidden="true">{date}</span>
+      }
+    </span>
+    <span class="flex justify-between gap-[0.06em]" aria-hidden="true">
+      {[...Array(10).keys()].map((k) => <span class:list={["h-[0.12em] w-[0.05em]", k === lit ? "bg-acid" : "bg-acid/30"]} />)}
+    </span>
+  </span>
+  {
+    gps ? (
+      <span class="mono flex flex-col justify-between border-l border-acid px-[0.6em] py-[0.6em] text-[0.26em] leading-none text-bone/85" aria-label={`GPS ${gps.join(" ")}`}>
+        <span class="text-acid" aria-hidden="true">GPS</span>
+        <span aria-hidden="true">{gps[0]}</span>
+        <span aria-hidden="true">{gps[1]}</span>
+      </span>
+    ) : (
+      <span />
+    )
+  }
+</span>
+
+<style>
+  /* One wheel per digit: a 0-9 strip shifted to its digit, rolled into place on load (.roll) */
+  .roll-wheel {
+    display: block;
+    height: 1em;
+    overflow: hidden;
+  }
+  .roll-strip {
+    display: flex;
+    flex-direction: column;
+    transform: translateY(calc(var(--n) * -1em));
+  }
+  .roll-strip > span {
+    height: 1em;
+    line-height: 1;
+  }
+</style>

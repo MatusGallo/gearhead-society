@@ -1,0 +1,27 @@
+---
+// Language entry point: Czech by default, English for browsers that do not prefer Czech or Slovak.
+---
+
+<!doctype html>
+<html lang="cs">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="refresh" content="0; url=/cs/" />
+    <link rel="canonical" href="/cs/" />
+    <link rel="alternate" hreflang="cs" href="/cs/" />
+    <link rel="alternate" hreflang="en" href="/en/" />
+    <title>Gearhead Society</title>
+    <script is:inline>
+      var l = (navigator.languages || [navigator.language || ""]).join(",").toLowerCase();
+      location.replace(/(^|,)(cs|sk)/.test(l) || !l ? "/cs/" : "/en/");
+    </script>
+    <style>
+      body { background: #070707; color: #f2f2f2; font-family: monospace; display: grid; place-items: center; min-height: 100vh; margin: 0; }
+      a { color: #c0fe04; margin: 0 0.75rem; }
+    </style>
+  </head>
+  <body>
+    <p><a href="/cs/">Česky</a><a href="/en/">English</a></p>
+  </body>
+</html>

@@ -1,0 +1,148 @@
+---
+/**
+ * Vertical accent tag after the Marathon strip label: ink on the accent. Built from pixel marks,
+ * a ring grid, a barcode, a target, the next event's name, city and year, its coordinates and
+ * times as number lines, and a ringed district code. `variant` (0..4) picks the order, which
+ * marks appear and whether it reads bottom to top or top to bottom, so no two pages repeat it
+ * (pick it with `hudVariant()`). Only real event data; without a dated event it shows the site
+ * name and city. Decorative, the same data is readable elsewhere.
+ */
+import { formatTime, nextEvent } from "../data/events";
+import { site } from "../data/site";
+import type { Lang } from "../i18n";
+
+interface Props {
+  lang: Lang;
+  variant?: number;
+  class?: string;
+}
+const { lang, variant = 0, class: cls = "" } = Astro.props;
+const e = nextEvent();
+
+const year = e?.start ? new Date(e.start).getFullYear() : undefined;
+const name = e ? [e.title, e.city[lang], year].filter(Boolean) : [site.name, site.city[lang]];
+const coords = e?.location?.coords;
+const nums = [
+  coords && `${coords[1].toFixed(5)} N`,
+  coords && `${coords[0].toFixed(5)} E`,
+  e?.start && [formatTime(e.start), e.end && formatTime(e.end)].filter(Boolean).join(" / "),
+].filter(Boolean) as string[];
+const code = (e?.location?.district ?? site.city[lang]).slice(0, 3);
+
+// Pixel marks as [columns, cells]: bow tie, blocky X (the reference), invader, arrow, notched square
+const pixels = {
+  tie: [6, [1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1]],
+  x: [5, [1, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 1]],
+  bug: [5, [0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1]],
+  arrow: [5, [0, 0, 1, 0, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0]],
+  notch: [5, [1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0, 1, 0, 1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 1]],
+} as const;
+type Part = keyof typeof pixels | "rings" | "bars" | "target" | "name" | "nums" | "code";
+const presets: { parts: Part[]; up: boolean }[] = [
+  { parts: ["tie", "rings", "name", "x", "nums", "code"], up: true },
+  { parts: ["bars", "nums", "bug", "name", "target"], up: false },
+  { parts: ["x", "name", "rings", "nums", "arrow", "code"], up: true },
+  { parts: ["target", "code", "nums", "notch", "bars", "name"], up: false },
+  { parts: ["arrow", "nums", "name", "tie", "rings"], up: true },
+];
+const preset = presets[((variant % 5) + 5) % 5];
+const bars = [3, 1, 2, 1, 3, 3, 1, 2, 1, 1, 3];
+---
+
+<div class:list={["tag-strip", preset.up ? "tag-up" : "tag-down", cls]} aria-hidden="true">
+  {
+    preset.parts.map((part) => {
+      if (part === "rings") return <span class="tag-rings">{Array.from({ length: 9 }, () => <i />)}</span>;
+      if (part === "bars") return <span class="tag-bars">{bars.map((h) => <i style={`height:${h}px`} />)}</span>;
+      if (part === "target") return <span class="tag-target" />;
+      if (part === "name") return <span class="tag-lines font-bold">{name.map((l) => <span>{l}</span>)}</span>;
+      if (part === "nums") return nums.length > 0 && <span class="tag-lines tag-nums">{nums.map((l) => <span>{l}</span>)}</span>;
+      if (part === "code") return <span class="tag-code">{[...code].map((ch) => <span><i />{ch}</span>)}</span>;
+      const [w, cells] = pixels[part];
+      return (
+        <svg class={w === 6 ? "w-7" : "w-6"} viewBox={`0 0 ${w} 5`} shape-rendering="crispEdges">
+          {cells.map((on, i) => on === 1 && <rect x={i % w} y={Math.floor(i / w)} width="1" height="1" />)}
+        </svg>
+      );
+    })
+  }
+</div>
+
+<style>
+  .tag-strip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.8rem;
+    width: 3.25rem;
+    padding: 0.9rem 0;
+    background: var(--color-acid);
+    color: var(--color-ink);
+    fill: currentColor;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+  }
+  .tag-lines {
+    display: flex;
+    gap: 0.15rem;
+    font-size: 9.5px;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+  /* Bottom to top: parts stack upwards and lines turn to read upwards; top to bottom reads down */
+  .tag-up { flex-direction: column-reverse; }
+  .tag-lines span { writing-mode: vertical-rl; }
+  .tag-up .tag-lines span { rotate: 180deg; }
+  .tag-down .tag-lines { flex-direction: row-reverse; }
+  .tag-nums {
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    font-variant-numeric: tabular-nums;
+  }
+  .tag-rings {
+    display: grid;
+    grid-template-columns: repeat(3, 6px);
+    gap: 2px;
+  }
+  .tag-rings i,
+  .tag-code i {
+    width: 6px;
+    height: 6px;
+    border: 1.5px solid currentColor;
+    border-radius: 50%;
+  }
+  .tag-bars {
+    display: grid;
+    gap: 2px;
+    width: 1.5rem;
+  }
+  .tag-bars i { background: currentColor; }
+  .tag-target {
+    display: grid;
+    place-items: center;
+    width: 1.1rem;
+    height: 1.1rem;
+    border: 2px solid currentColor;
+  }
+  .tag-target::after {
+    content: "";
+    width: 5px;
+    height: 5px;
+    background: currentColor;
+  }
+  .tag-code {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 0.2rem;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .tag-code span {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+    rotate: -90deg;
+  }
+  .tag-down .tag-code { flex-direction: column; }
+  .tag-down .tag-code span { rotate: 90deg; }
+</style>

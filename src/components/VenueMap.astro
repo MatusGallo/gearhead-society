@@ -1,0 +1,477 @@
+---
+/**
+ * Venue address split into parts. Pointing at a part (hover, focus or tap) flies the map to
+ * that scale: street, district, city, country. The toggle switches between the one-line
+ * address and a labelled breakdown. Map tiles load only when the section nears the viewport.
+ *
+ * The map sits under a tactical HUD: crosshair and reticle on the venue, range rings and a
+ * scale bar measured from the live zoom, and a countdown to the event start. Every readout
+ * is real venue or event data.
+ */
+import Icon from "./Icon.astro";
+import type { EventLocation } from "../data/events";
+import { translator, type Lang } from "../i18n";
+
+interface Props {
+  lang: Lang;
+  venue: string;
+  location: EventLocation;
+  /** ISO event start; shown as a T-minus readout while it lies ahead */
+  start?: string;
+}
+
+const { lang, venue, location: loc, start } = Astro.props;
+const t = translator(lang);
+const [lon, lat] = loc.coords;
+
+const parts = [
+  { key: "street", label: t({ cs: "Ulice", en: "Street" }), value: loc.street, zoom: 16.3 },
+  { key: "district", label: t({ cs: "Čtvrť", en: "District" }), value: loc.district, zoom: 14 },
+  { key: "city", label: t({ cs: "Město", en: "City" }), value: loc.city[lang], zoom: 10.8 },
+  { key: "country", label: t({ cs: "Země", en: "Country" }), value: loc.country[lang], zoom: 6 },
+];
+const levels = parts.map(({ key, zoom }) => ({ key, zoom }));
+/** Range ring radii in CSS pixels; their labels are measured from the live zoom */
+const rings = [70, 140, 210];
+const mapsUrl = `https://mapy.com/fnc/v1/showmap?mapset=basic&center=${lon},${lat}&zoom=17&marker=true`;
+const split = { cs: "Rozložit adresu", en: "Split address" };
+const join = { cs: "Spojit adresu", en: "Join address" };
+const status = { moving: t({ cs: "Zaměřuji", en: "Acquiring" }), locked: t({ cs: "Cíl zaměřen", en: "Target locked" }) };
+---
+
+<section
+  class="venue border-t border-line"
+  data-venue
+  data-lang={lang}
+  data-levels={JSON.stringify(levels)}
+  data-coords={JSON.stringify(loc.coords)}
+  data-start={start}
+  data-split={t(split)}
+  data-join={t(join)}
+  data-moving={status.moving}
+  data-locked={status.locked}
+>
+  <div class="mx-auto grid max-w-[1400px] lg:min-h-[78dvh] lg:grid-cols-[1fr_1.35fr]">
+    <div class="flex flex-col justify-between gap-12 px-4 py-16 sm:px-6 lg:py-20 lg:pr-12">
+      <div>
+        <h2 class="display text-3xl">{t({ cs: "Místo", en: "Venue" })}</h2>
+        <p class="mono mt-3 flex items-center gap-2 text-sm text-mute"><Icon name="factory" class="size-4 text-acid" /> {venue}</p>
+      </div>
+
+      <address class="addr relative not-italic" data-view="line">
+        <span class="addr-tip mono" aria-hidden="true"></span>
+        {
+          parts.map((p, i) => (
+            <button type="button" class="part" data-key={p.key} aria-pressed={i === 0 ? "true" : "false"} style={`view-transition-name: vm-${p.key}`}>
+              <span class="part-label mono">{p.label}</span>
+              <span class="part-text display">{p.value}</span>
+              {i < parts.length - 1 && <span class="part-sep display">,</span>}
+              <span class="sr-only">, {t({ cs: "ukázat na mapě", en: "show on map" })}</span>
+            </button>
+          ))
+        }
+      </address>
+
+      <div class="flex flex-wrap items-center gap-3">
+        <button type="button" class="btn btn-ghost min-h-11 px-4 text-xs" data-toggle aria-pressed="false">
+          <Icon name="rows" class="size-4" /> <span data-toggle-text>{t(split)}</span>
+        </button>
+        <a href={mapsUrl} target="_blank" rel="noopener" class="btn btn-ghost min-h-11 px-4 text-xs">
+          {t({ cs: "Otevřít v mapách", en: "Open in maps" })} <Icon name="arrow-up-right" class="size-4" />
+        </a>
+      </div>
+    </div>
+
+    <div class="relative min-h-[60dvh] p-2 lg:p-4">
+      <div class="vm frame frame-on relative size-full min-h-[inherit] overflow-hidden bg-ink">
+        <div class="vm-canvas !absolute inset-0" data-map aria-hidden="true"></div>
+
+        <div class="hud" aria-hidden="true">
+          <div class="hud-grid"></div>
+          {
+            rings.map((r, i) => (
+              <div class:list={["hud-ring", i === rings.length - 1 && "hud-ring-outer"]} style={`--r:${r}px`}>
+                <span class="hud-ring-label mono" data-ring={r}></span>
+              </div>
+            ))
+          }
+          <div class="hud-cross"></div>
+          <div class="hud-reticle" data-reticle><i></i></div>
+          <div class="hud-ruler-x"></div>
+          <div class="hud-ruler-y"></div>
+          <div class="hud-scan"></div>
+
+          <div class="hud-panel top-4 left-5">
+            <p class="text-acid">{t({ cs: "Sektor", en: "Sector" })} <span data-level-label class="text-bone">{parts[0].label}</span></p>
+            <p class="hud-status" data-status>{status.locked}</p>
+          </div>
+
+          <div class="hud-panel hud-target top-4 right-10 text-right">
+            <p class="text-acid">{t({ cs: "Cíl", en: "Target" })}</p>
+            <p class="text-bone">{venue}</p>
+            {start && <p class="mt-1 text-bone/80" data-tminus></p>}
+          </div>
+
+          <div class="hud-panel bottom-4 left-5">
+            <p><span class="text-acid">LAT</span> {lat.toFixed(5)}° N</p>
+            <p><span class="text-acid">LON</span> {lon.toFixed(5)}° E</p>
+          </div>
+
+          <div class="hud-panel right-10 bottom-4 text-right">
+            <p class="hud-scale ml-auto" style="width:96px"></p>
+            <p><span data-scale></span> <span class="text-acid">Z</span> <span data-zoom></span></p>
+          </div>
+        </div>
+
+        <p class="rail mono absolute top-1/2 right-2 z-10 flex -translate-y-1/2 gap-3 text-[0.55rem] text-mute">
+          <a href="https://openfreemap.org" target="_blank" rel="noopener" class="hover:text-acid">OpenFreeMap</a>
+          <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener" class="hover:text-acid">© OpenMapTiles</a>
+          <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener" class="hover:text-acid">© OpenStreetMap</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  /* One-line view: parts flow as a sentence. Split view: labelled stack. */
+  .part {
+    display: inline;
+    text-align: left;
+    color: var(--color-bone);
+    font-size: clamp(2.25rem, 5vw, 4.25rem);
+    cursor: pointer;
+    transition: color 0.3s var(--ease-out-expo);
+  }
+  .part-text,
+  .part-sep {
+    font-size: inherit;
+    line-height: 1.02;
+  }
+  .part-sep { margin-right: 0.28em; }
+  .part-label { display: none; }
+  .part[aria-pressed="true"] { color: var(--color-acid); }
+  .part:focus-visible { outline-offset: 6px; }
+
+  .addr[data-view="split"] {
+    display: grid;
+    gap: 1.4rem;
+  }
+  .addr[data-view="split"] .part {
+    display: block;
+    font-size: clamp(1.75rem, 3.2vw, 2.75rem);
+  }
+  .addr[data-view="split"] .part-label {
+    display: block;
+    margin-bottom: 0.35rem;
+    font-size: 0.7rem;
+    color: var(--color-mute);
+  }
+  .addr[data-view="split"] .part-sep,
+  .addr[data-view="split"] .addr-tip { display: none; }
+
+  /* Tag riding above the pointed part */
+  .addr-tip {
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 2;
+    padding: 0.3rem 0.55rem;
+    background: var(--color-acid);
+    color: var(--color-ink);
+    font-size: 0.7rem;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transform: translate(-50%, calc(-100% - 10px));
+    transition: left 0.4s var(--ease-out-expo), top 0.4s var(--ease-out-expo), opacity 0.3s;
+  }
+  .addr-tip::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    border: 5px solid transparent;
+    border-top-color: var(--color-acid);
+    transform: translateX(-50%);
+  }
+  .addr-tip[data-on] { opacity: 1; }
+
+  .vm-canvas {
+    opacity: 0;
+    transition: opacity 0.8s var(--ease-out-expo);
+  }
+  .vm-canvas[data-ready] { opacity: 1; }
+
+  /* ---- Tactical HUD ---- */
+  .hud {
+    --hud: rgb(192 254 4 / 0.5);
+    --hud-faint: rgb(192 254 4 / 0.07);
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    pointer-events: none;
+  }
+  .hud > * { position: absolute; }
+
+  /* Coordinate grid, heavier every fourth line */
+  .hud-grid {
+    inset: 0;
+    background:
+      linear-gradient(var(--hud-faint) 1px, transparent 1px) 50% 50% / 40px 40px,
+      linear-gradient(90deg, var(--hud-faint) 1px, transparent 1px) 50% 50% / 40px 40px,
+      linear-gradient(rgb(192 254 4 / 0.12) 1px, transparent 1px) 50% 50% / 160px 160px,
+      linear-gradient(90deg, rgb(192 254 4 / 0.12) 1px, transparent 1px) 50% 50% / 160px 160px;
+  }
+
+  /* Edge rulers, long tick every 40px */
+  .hud-ruler-x {
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 10px;
+    background:
+      repeating-linear-gradient(90deg, var(--hud) 0 1px, transparent 1px 8px) 50% 0 / 100% 4px no-repeat,
+      repeating-linear-gradient(90deg, var(--hud) 0 1px, transparent 1px 40px) 50% 0 / 100% 10px no-repeat;
+  }
+  .hud-ruler-y {
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 10px;
+    background:
+      repeating-linear-gradient(var(--hud) 0 1px, transparent 1px 8px) 0 50% / 4px 100% no-repeat,
+      repeating-linear-gradient(var(--hud) 0 1px, transparent 1px 40px) 0 50% / 10px 100% no-repeat;
+  }
+
+  /* Crosshair through the venue, open in the middle for the reticle */
+  .hud-cross {
+    inset: 0;
+    --g: 46px;
+    background:
+      linear-gradient(90deg, var(--hud) 0 calc(50% - var(--g)), transparent 0 calc(50% + var(--g)), var(--hud) 0) 0 50% / 100% 1px no-repeat,
+      linear-gradient(var(--hud) 0 calc(50% - var(--g)), transparent 0 calc(50% + var(--g)), var(--hud) 0) 50% 0 / 1px 100% no-repeat;
+    opacity: 0.55;
+  }
+
+  .hud-ring {
+    left: 50%;
+    top: 50%;
+    width: calc(var(--r) * 2);
+    height: calc(var(--r) * 2);
+    border: 1px dashed rgb(192 254 4 / 0.28);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+  }
+  .hud-ring-label {
+    position: absolute;
+    left: 50%;
+    top: -0.55rem;
+    padding: 0 0.3rem;
+    background: var(--color-ink);
+    color: var(--color-acid);
+    font-size: 0.6rem;
+    transform: translateX(6px);
+    white-space: nowrap;
+  }
+
+  /* Reticle: corner brackets, a centre pip, and a lock-on pulse from script */
+  .hud-reticle {
+    --c: var(--color-acid);
+    --l: 12px;
+    left: 50%;
+    top: 50%;
+    width: 60px;
+    height: 60px;
+    margin: -30px 0 0 -30px;
+    background:
+      linear-gradient(var(--c), var(--c)) top left / var(--l) 2px no-repeat,
+      linear-gradient(var(--c), var(--c)) top left / 2px var(--l) no-repeat,
+      linear-gradient(var(--c), var(--c)) top right / var(--l) 2px no-repeat,
+      linear-gradient(var(--c), var(--c)) top right / 2px var(--l) no-repeat,
+      linear-gradient(var(--c), var(--c)) bottom left / var(--l) 2px no-repeat,
+      linear-gradient(var(--c), var(--c)) bottom left / 2px var(--l) no-repeat,
+      linear-gradient(var(--c), var(--c)) bottom right / var(--l) 2px no-repeat,
+      linear-gradient(var(--c), var(--c)) bottom right / 2px var(--l) no-repeat;
+  }
+  .hud-reticle i {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 10px;
+    height: 10px;
+    margin: -5px 0 0 -5px;
+    background: var(--color-acid);
+    box-shadow: 0 0 0 3px var(--color-ink), 0 0 18px rgb(192 254 4 / 0.8);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .hud-status[data-moving] { animation: hud-blink 0.5s steps(2, end) infinite; }
+  }
+  @keyframes hud-blink {
+    50% { opacity: 0.25; }
+  }
+
+  /* CRT scanlines and a vignette to pull the eye to the target */
+  .hud-scan {
+    inset: 0;
+    background:
+      repeating-linear-gradient(to bottom, rgb(0 0 0 / 0.22) 0 1px, transparent 1px 3px),
+      radial-gradient(ellipse at center, transparent 45%, rgb(7 7 7 / 0.75) 100%);
+  }
+
+  .hud-panel {
+    z-index: 1;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    line-height: 1.6;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgb(242 242 242 / 0.7);
+    text-shadow: 0 0 6px var(--color-ink);
+  }
+  .hud-status { color: var(--color-acid); }
+  .hud-status::before { content: "■ "; }
+  .hud-status[data-moving] { color: var(--color-bone); }
+
+  .hud-scale {
+    height: 6px;
+    margin-bottom: 0.3rem;
+    border: 1px solid var(--color-acid);
+    border-top: 0;
+  }
+
+  @media (max-width: 639px) {
+    .hud-panel { font-size: 0.58rem; }
+    .hud-target { max-width: 50%; }
+    /* Outer ring runs into the corner panels on a phone */
+    .hud-ring-outer { display: none; }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    ::view-transition-group(*) { animation-duration: 0.45s; animation-timing-function: var(--ease-out-expo); }
+  }
+</style>
+
+<script>
+  import type { Level } from "../scripts/venue-map";
+
+  /** 1234 m -> "1.2 KM", 180 m -> "180 M", rounded for a readout */
+  const distance = (m: number) => {
+    if (m < 1000) return `${Math.round(m / 10) * 10} M`;
+    const km = m / 1000;
+    return `${km < 10 ? km.toFixed(1) : Math.round(km)} KM`;
+  };
+
+  for (const root of document.querySelectorAll<HTMLElement>("[data-venue]")) {
+    const levels: Level[] = JSON.parse(root.dataset.levels!);
+    const coords: [number, number] = JSON.parse(root.dataset.coords!);
+    const addr = root.querySelector<HTMLElement>(".addr")!;
+    const tip = root.querySelector<HTMLElement>(".addr-tip")!;
+    const parts = [...root.querySelectorAll<HTMLButtonElement>(".part")];
+    const levelLabel = root.querySelector<HTMLElement>("[data-level-label]")!;
+    const toggle = root.querySelector<HTMLButtonElement>("[data-toggle]")!;
+    const toggleText = root.querySelector<HTMLElement>("[data-toggle-text]")!;
+    const mapEl = root.querySelector<HTMLElement>("[data-map]")!;
+    const statusEl = root.querySelector<HTMLElement>("[data-status]")!;
+    const reticle = root.querySelector<HTMLElement>("[data-reticle]")!;
+    const scaleEl = root.querySelector<HTMLElement>("[data-scale]")!;
+    const zoomEl = root.querySelector<HTMLElement>("[data-zoom]")!;
+    const ringLabels = [...root.querySelectorAll<HTMLElement>("[data-ring]")];
+    const tminus = root.querySelector<HTMLElement>("[data-tminus]");
+    const still = matchMedia("(prefers-reduced-motion: reduce)");
+    let active = parts[0];
+    let fly: ((l: Level) => void) | undefined;
+    let wasMoving = false;
+
+    const placeTip = () => {
+      const r = active.querySelector(".part-text")!.getClientRects()[0];
+      const box = addr.getBoundingClientRect();
+      if (!r) return;
+      const half = tip.offsetWidth / 2;
+      const x = Math.min(Math.max(r.left + r.width / 2 - box.left, half), box.width - half);
+      tip.style.left = `${x}px`;
+      tip.style.top = `${r.top - box.top}px`;
+      tip.textContent = active.querySelector(".part-label")!.textContent;
+      tip.setAttribute("data-on", "");
+    };
+
+    const select = (part: HTMLButtonElement) => {
+      if (part === active && tip.hasAttribute("data-on")) return;
+      active = part;
+      parts.forEach((p) => p.setAttribute("aria-pressed", String(p === part)));
+      levelLabel.textContent = part.querySelector(".part-label")!.textContent!;
+      placeTip();
+      fly?.(levels.find((l) => l.key === part.dataset.key)!);
+    };
+
+    parts.forEach((p) => {
+      p.addEventListener("pointerenter", () => select(p));
+      p.addEventListener("focus", () => select(p));
+      p.addEventListener("click", () => select(p));
+    });
+
+    toggle.addEventListener("click", () => {
+      const split = addr.dataset.view !== "split";
+      const apply = () => {
+        addr.dataset.view = split ? "split" : "line";
+        toggle.setAttribute("aria-pressed", String(split));
+        toggleText.textContent = (split ? root.dataset.join : root.dataset.split)!;
+      };
+      if (document.startViewTransition && !still.matches) document.startViewTransition(apply).finished.then(placeTip);
+      else (apply(), placeTip());
+    });
+
+    new ResizeObserver(() => tip.hasAttribute("data-on") && placeTip()).observe(addr);
+    document.fonts?.ready.then(placeTip);
+
+    /* HUD readouts follow the live zoom; the reticle pulses once when a flight lands */
+    const onView = (zoom: number, moving: boolean) => {
+      const mpp = (40075016.686 * Math.cos((coords[1] * Math.PI) / 180)) / (512 * 2 ** zoom);
+      ringLabels.forEach((el) => (el.textContent = distance(Number(el.dataset.ring) * mpp)));
+      scaleEl.textContent = distance(96 * mpp);
+      zoomEl.textContent = zoom.toFixed(1);
+      statusEl.textContent = (moving ? root.dataset.moving : root.dataset.locked)!;
+      statusEl.toggleAttribute("data-moving", moving);
+      if (wasMoving && !moving && !still.matches) {
+        reticle.animate(
+          [
+            { transform: "scale(2.4) rotate(45deg)", opacity: 0 },
+            { transform: "scale(0.85) rotate(0deg)", opacity: 1, offset: 0.7 },
+            { transform: "none", opacity: 1 },
+          ],
+          { duration: 520, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
+        );
+      }
+      wasMoving = moving;
+    };
+
+    if (tminus && root.dataset.start) {
+      const target = Date.parse(root.dataset.start);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const tick = () => {
+        const s = Math.max(0, Math.floor((target - Date.now()) / 1000));
+        const d = Math.floor(s / 86400);
+        tminus.textContent = `T-${d}D ${pad(Math.floor(s / 3600) % 24)}:${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}`;
+      };
+      tick();
+      setInterval(tick, 1000);
+    }
+
+    new IntersectionObserver(
+      async (entries, io) => {
+        if (!entries.some((e) => e.isIntersecting)) return;
+        io.disconnect();
+        const { mountVenueMap } = await import("../scripts/venue-map");
+        fly = mountVenueMap({
+          container: mapEl,
+          venue: coords,
+          level: levels.find((l) => l.key === active.dataset.key)!,
+          lang: root.dataset.lang!,
+          onView,
+        });
+      },
+      { rootMargin: "400px" },
+    ).observe(root);
+  }
+</script>

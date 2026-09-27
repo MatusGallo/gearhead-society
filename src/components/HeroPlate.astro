@@ -1,0 +1,50 @@
+---
+/**
+ * Graded hero photo with depth. Layers, bottom to top:
+ *   base   the graded plate (tone), fades in at load, drifts a little against the pointer
+ *   ghost  the same photo in violet, screened slightly out of register like a misprinted
+ *          poster; it locks into register on load and slips with the pointer
+ *   slot   overlays in photo coordinates: a layer sized and cropped exactly like the photo
+ *          (object-fit cover at `focus`), so `left/top` percent point at the same spot on
+ *          the image at any viewport; it drifts with the photo
+ * Place it inside a `[data-pointer]` element (see Pointer.astro). Without a fine pointer,
+ * or under reduced motion, it is a still graded photo.
+ */
+import Icon from "./Icon.astro";
+import Pointer from "./Pointer.astro";
+import Visual from "./Visual.astro";
+
+interface Props {
+  src: string;
+  alt?: string;
+  tone?: "acid" | "violet";
+  /** CSS object-position for the crop, as "x% y%" */
+  focus?: string;
+  /** Crop below 640px, where a wide photo shows only a narrow slice; defaults to `focus` */
+  focusMobile?: string;
+  /** Photo width / height, needed to map the slot overlay onto the crop */
+  ratio?: number;
+  /** Scanline texture over the photo; off for the home hero */
+  scanlines?: boolean;
+}
+const { src, alt = "", tone = "acid", focus = "50% 50%", focusMobile = focus, ratio = 1.5, scanlines = true } = Astro.props;
+const [fx, fy] = focus.split(" ").map((v) => parseFloat(v) / 100);
+const [mfx, mfy] = focusMobile.split(" ").map((v) => parseFloat(v) / 100);
+// Crop as CSS vars so the photo layers and the slot overlay switch together at the breakpoint
+const crop = `--ar:${ratio};--dfx:${fx};--dfy:${fy};--mfx:${mfx};--mfy:${mfy}`;
+const pos = "calc(var(--fx) * 100%) calc(var(--fy) * 100%)";
+---
+
+<div class="hero-plate absolute inset-0 overflow-hidden [container-type:size]" style={crop}>
+  <Visual src={src} alt={alt} tone={tone} fx={scanlines ? ["lines", "grain"] : ["grain"]} loading="eager" focus={pos} imgClass="hp-depth" class="plate-fade !absolute inset-0" />
+  <Visual src={src} tone="violet" loading="eager" focus={pos} imgClass="hp-depth" class="hp-ghost !absolute inset-0" />
+  <div class="hp-depth absolute inset-0" aria-hidden="true">
+    <div class="hp-map"><slot /></div>
+  </div>
+  <!-- Registration marks on the plate corners -->
+  <div class="pointer-events-none absolute inset-4 text-acid sm:inset-6" aria-hidden="true">
+    <Icon name="plus" class="absolute top-0 left-0 size-4" />
+    <Icon name="plus" class="absolute top-0 right-0 size-4" />
+  </div>
+</div>
+<Pointer />

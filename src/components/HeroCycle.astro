@@ -1,0 +1,304 @@
+---
+/**
+ * Photo <-> ops-map cycle for a hero. Put `data-cycle` on the hero container, and inside it:
+ *   [data-cycle-photo]  the photo layer (HeroPlate)
+ *   [data-cycle-map]    the map layer (HeroOpsMap, or a ScanField with controls={false} + OpsLayer run="cue")
+ *   [data-cycle-a/b]    two stacked texts that swap in place (e.g. the date, then the district)
+ *   [data-cycle-toggle] the one pause button for the whole hero
+ *
+ * The photo holds for PHOTO ms, then the camera pushes through it into the map (centred on the
+ * venue, or on the pointer after a click) while the date is wiped away and the district rises
+ * in its place; the squad sequence is cued from zero (OpsLayer), and after MAP ms the map pulls
+ * away and the photo settles back. Runs only while the hero is on screen and the tab is visible; the
+ * map stops drawing while hidden. Under reduced motion there is no cycle: the photo stays.
+ *
+ * The viewer can also switch: a click on the hero (outside its links and buttons) cuts right
+ * away, and the timer starts over. With a fine pointer, hovering the photo
+ * opens a peek at the map through a lens that follows the pointer (`--x/--y` from Pointer.astro).
+ *
+ * Events on the hero element for the map layer: `cycle:prepare` (soon after load, or on the
+ * first hover; load in the background), `cycle:peek` (lens opens), `cycle:map` / `cycle:photo`
+ * (each cut), `cycle:pause` (detail: boolean).
+ */
+interface Props {
+  pauseLabel: string;
+  playLabel: string;
+  /** Hint on the peek lens */
+  peekLabel: string;
+}
+const { pauseLabel, playLabel, peekLabel } = Astro.props;
+---
+
+<div class="cycle-peek" aria-hidden="true">
+  <span class="cycle-peek-ring"></span>
+  <span class="cycle-peek-label mono">{peekLabel}</span>
+</div>
+
+<button
+  type="button"
+  class="cycle-toggle absolute top-11 right-3 z-20 sm:top-14 sm:right-5 hidden size-11 place-items-center border border-bone/30 bg-ink/75 text-bone/80 transition-colors hover:border-acid hover:text-acid"
+  data-cycle-toggle
+  data-pause={pauseLabel}
+  data-play={playLabel}
+  aria-label={pauseLabel}
+  aria-pressed="false"
+>
+  <svg viewBox="0 0 16 16" class="size-3.5" aria-hidden="true"><path class="i-pause" fill="currentColor" d="M3 2h3v12H3zM10 2h3v12h-3z" /><path class="i-play hidden" fill="currentColor" d="M4 2l10 6-10 6z" /></svg>
+</button>
+
+<style is:global>
+  [data-cycle-map] {
+    opacity: 0;
+    visibility: hidden;
+  }
+  [data-cycle-b] {
+    opacity: 0;
+  }
+  /* Own stacking context, so the photo's tracking tags stay under the map (peek lens) */
+  [data-cycle-photo] {
+    isolation: isolate;
+  }
+  [data-cycle] .cycle-toggle:not(.hidden) {
+    display: grid;
+  }
+
+  /* Peek: the map shows through a lens at the pointer while the photo is up. !important beats
+     the finished cut animation that keeps the map hidden, without restarting it */
+  .cycle-peek {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 3;
+    pointer-events: none;
+    opacity: 0;
+    translate: var(--x, 50%) var(--y, 50%);
+    transition: opacity 0.25s;
+  }
+  .cycle-peek-ring {
+    position: absolute;
+    width: 18rem;
+    height: 18rem;
+    margin: -9rem 0 0 -9rem;
+    border: 1px solid var(--color-acid);
+    border-radius: 50%;
+  }
+  .cycle-peek-label {
+    position: absolute;
+    top: 9.6rem;
+    left: 0;
+    translate: -50% 0;
+    padding: 0.25rem 0.5rem;
+    background: var(--color-acid);
+    color: var(--color-ink);
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  @media (pointer: fine) {
+    [data-cycle][data-view="photo"] {
+      cursor: crosshair;
+    }
+    [data-view="photo"][data-peek] [data-cycle-map] {
+      visibility: visible !important;
+      opacity: 1 !important;
+      clip-path: circle(9rem at var(--x, 50%) var(--y, 50%));
+    }
+    [data-view="photo"][data-peek] .cycle-peek {
+      opacity: 1;
+    }
+  }
+
+  /* Push-through cut, like a camera diving into the feed: the photo pushes in and dissolves
+     while the map settles from a slight zoom, in step with its own descent; back, the map
+     pulls away and the photo settles in. Transform and opacity only. The push centres on the
+     venue (50% / 40%, 30% on phones), or on the pointer after a click (set inline) */
+  [data-cycle] {
+    --ix: 50%;
+    --iy: 40%;
+  }
+  @media (max-width: 639px) {
+    [data-cycle] { --iy: 30%; }
+  }
+  [data-cycle-photo],
+  [data-cycle-map] {
+    transform-origin: var(--ix) var(--iy);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    [data-view="map"] [data-cycle-photo] { animation: push-out 0.9s cubic-bezier(0.55, 0, 0.8, 0.4) both; }
+    [data-view="map"] [data-cycle-map] { animation: settle-in 1.1s cubic-bezier(0.15, 0.6, 0.25, 1) 0.2s both; }
+    [data-view="map"] [data-cycle-a] { animation: wipe-out 0.45s cubic-bezier(0.7, 0, 0.3, 1) both; }
+    [data-view="map"] [data-cycle-b] { animation: wipe-in 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) 0.5s both; }
+    /* And back; only after the first cut, so the page load keeps its own intro */
+    [data-view="photo"][data-cycled] [data-cycle-map] { animation: pull-out 0.8s cubic-bezier(0.55, 0, 0.8, 0.4) both; }
+    [data-view="photo"][data-cycled] [data-cycle-photo] { animation: settle-back 1.1s cubic-bezier(0.15, 0.6, 0.25, 1) 0.15s both; }
+    [data-view="photo"][data-cycled] [data-cycle-b] { animation: wipe-out 0.45s cubic-bezier(0.7, 0, 0.3, 1) both; }
+    [data-view="photo"][data-cycled] [data-cycle-a] { animation: wipe-in 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) 0.5s both; }
+  }
+
+  @keyframes push-out {
+    from { visibility: visible; opacity: 1; transform: none; }
+    to { visibility: hidden; opacity: 0; transform: scale(1.18); }
+  }
+  @keyframes settle-in {
+    from { visibility: visible; opacity: 0; transform: scale(1.12); }
+    to { visibility: visible; opacity: 1; transform: none; }
+  }
+  @keyframes pull-out {
+    from { visibility: visible; opacity: 1; transform: none; }
+    to { visibility: hidden; opacity: 0; transform: scale(0.9); }
+  }
+  @keyframes settle-back {
+    from { visibility: visible; opacity: 0; transform: scale(1.08); }
+    to { visibility: visible; opacity: 1; transform: none; }
+  }
+  /* Outline texts swap in place: one is wiped away upward, the other rises in from its baseline */
+  @keyframes wipe-out {
+    from { opacity: 1; clip-path: inset(0 0 0 0); }
+    to { opacity: 1; clip-path: inset(0 0 100% 0); }
+  }
+  @keyframes wipe-in {
+    from { opacity: 1; clip-path: inset(100% 0 0 0); }
+    to { opacity: 1; clip-path: inset(0 0 0 0); }
+  }
+</style>
+
+<script>
+  const PHOTO = 5000;
+  const MAP = 14500;
+
+  document.querySelectorAll<HTMLElement>("[data-cycle]").forEach((hero) => {
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const scan = hero.querySelector<HTMLElement>("[data-cycle-map] [data-scan]");
+    const toggle = hero.querySelector<HTMLButtonElement>("[data-cycle-toggle]");
+    const emit = (el: HTMLElement | null, type: string, detail?: boolean) => el?.dispatchEvent(new CustomEvent(type, { detail }));
+    let prepared = false;
+    const prepare = () => {
+      if (prepared) return;
+      prepared = true;
+      const go = () => emit(hero, "cycle:prepare");
+      setTimeout(() => ("requestIdleCallback" in window ? requestIdleCallback(go, { timeout: 1500 }) : go()), 1500);
+    };
+
+    let view: "photo" | "map" = "photo";
+    let timer = 0;
+    let left = PHOTO; // time remaining in the current phase
+    let since = 0;
+    let onScreen = false;
+    let paused = false;
+
+    hero.setAttribute("data-view", "photo");
+    emit(scan, "scan:idle", true);
+    toggle?.classList.remove("hidden");
+    // The lens opens once per visit of the pointer: after a cut back to the photo it waits for
+    // the pointer to leave, so switching back never shows the map again at once
+    let armed = true;
+
+    // `at`: pointer position in the hero for a viewer switch, so the push centres there
+    const cut = (at?: { x: number; y: number }) => {
+      view = view === "photo" ? "map" : "photo";
+      if (view === "map" && at) {
+        hero.style.setProperty("--ix", `${at.x}px`);
+        hero.style.setProperty("--iy", `${at.y}px`);
+      } else {
+        // Timed cuts, and every cut back to the photo, centre on the venue
+        ["--ix", "--iy"].forEach((v) => hero.style.removeProperty(v));
+      }
+      armed = false;
+      hero.removeAttribute("data-peek");
+      hero.setAttribute("data-cycled", "");
+      hero.setAttribute("data-view", view);
+      emit(hero, view === "map" ? "cycle:map" : "cycle:photo");
+      if (view === "map") {
+        emit(scan, "scan:idle", false);
+        hero.removeAttribute("data-ops-run");
+        // HeroOpsMap sets data-ops-late: it cues the squad itself once the camera has landed
+        if (!hero.hasAttribute("data-ops-late")) {
+          void hero.offsetWidth;
+          hero.setAttribute("data-ops-run", "");
+        }
+      } else {
+        // Keep drawing through the fade-out, then rest; the ops overlay goes back to its locked
+        // resting state, which is what the peek lens shows
+        setTimeout(() => {
+          if (view !== "photo") return;
+          emit(scan, "scan:idle", true);
+          hero.removeAttribute("data-ops-run");
+        }, 1100);
+      }
+      left = view === "map" ? MAP : PHOTO;
+      schedule();
+    };
+
+    const schedule = () => {
+      clearTimeout(timer);
+      const running = onScreen && !paused && !document.hidden;
+      // Pausing freezes CSS animations mid-way, like the ScanField pause
+      hero.toggleAttribute("data-cycle-paused", !running);
+      if (!running) return;
+      since = performance.now();
+      timer = window.setTimeout(() => cut(), left);
+    };
+    const hold = () => {
+      if (since) left = Math.max(400, left - (performance.now() - since));
+      since = 0;
+      schedule();
+    };
+
+    new IntersectionObserver(([e]) => {
+      onScreen = e.isIntersecting;
+      if (onScreen) prepare();
+      onScreen ? schedule() : hold();
+    }).observe(hero);
+    document.addEventListener("visibilitychange", () => (document.hidden ? hold() : schedule()));
+
+    // Viewer switch: the cut happens now and the phase timer starts over
+    const now = (at?: { x: number; y: number }) => {
+      prepared = true;
+      emit(hero, "cycle:prepare");
+      cut(at);
+    };
+    hero.addEventListener("click", (e) => {
+      if ((e.target as Element).closest("a, button, input, label, summary")) return;
+      const r = hero.getBoundingClientRect();
+      now({ x: e.clientX - r.left, y: e.clientY - r.top });
+    });
+
+    // Peek lens on hover, photo only, and only once the map has drawn (HeroOpsMap sets
+    // data-map-ready); before that the hover just starts loading it
+    if (matchMedia("(pointer: fine)").matches) {
+      hero.addEventListener("pointermove", (e) => {
+        if (view !== "photo" || !armed || hero.hasAttribute("data-peek")) return;
+        if ((e.target as Element).closest("a, button")) return;
+        prepared = true;
+        emit(hero, "cycle:prepare");
+        if (!hero.hasAttribute("data-map-ready")) return;
+        emit(hero, "cycle:peek");
+        hero.setAttribute("data-peek", "");
+      });
+      hero.addEventListener("pointerleave", () => {
+        armed = true;
+        hero.removeAttribute("data-peek");
+      });
+    }
+
+    toggle?.addEventListener("click", () => {
+      paused = !paused;
+      toggle.setAttribute("aria-pressed", String(paused));
+      toggle.setAttribute("aria-label", (paused ? toggle.dataset.play : toggle.dataset.pause) || "");
+      toggle.querySelector(".i-pause")!.classList.toggle("hidden", paused);
+      toggle.querySelector(".i-play")!.classList.toggle("hidden", !paused);
+      emit(scan, "scan:pause", paused);
+      emit(hero, "cycle:pause", paused);
+      paused ? hold() : schedule();
+    });
+  });
+</script>
+
+<style is:global>
+  [data-cycle-paused] [data-cycle-photo],
+  [data-cycle-paused] [data-cycle-map],
+  [data-cycle-paused] [data-cycle-a],
+  [data-cycle-paused] [data-cycle-b] {
+    animation-play-state: paused;
+  }
+</style>

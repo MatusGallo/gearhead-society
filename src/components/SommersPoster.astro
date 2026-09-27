@@ -1,0 +1,37 @@
+---
+/**
+ * Poster for a Sommers edition: a still scan-map frame with the edition number,
+ * title, dates and place set over it. Generated from data, scales via cqw units.
+ */
+import ScanField from "./ScanField.astro";
+import { editionLabel, formatGps, formatRange, type SommersEdition } from "../data/sommers";
+import type { Lang } from "../i18n";
+
+interface Props {
+  edition: SommersEdition;
+  lang: Lang;
+  class?: string;
+}
+
+const { edition: e, lang, class: cls = "" } = Astro.props;
+const big = e.number ? String(e.number) : `${Number(e.start.slice(8, 10))}.${Number(e.start.slice(5, 7))}.`;
+---
+
+<div
+  class:list={["@container relative aspect-[4/3] overflow-hidden text-bone", cls]}
+  role="img"
+  aria-label={`${editionLabel(e, lang)}: ${e.title[lang]}, ${formatRange(e.start, e.end, lang)}, ${e.place[lang]}`}
+>
+  <ScanField seed={e.seed} animate={false} labels={[]} class="!absolute inset-0" />
+  <div class="absolute inset-0 bg-gradient-to-t from-ink via-ink/40 to-transparent"></div>
+  <span class="display pointer-events-none absolute top-[3cqw] right-[4cqw] text-[30cqw] !leading-[0.8] text-acid select-none" aria-hidden="true">{big}</span>
+  <div class="relative flex h-full flex-col justify-between p-[5cqw]" aria-hidden="true">
+    <span class="mono self-start bg-acid px-[1.4cqw] py-[0.6cqw] text-[2.6cqw] text-ink">{editionLabel(e, lang)}</span>
+    <div class="max-w-[80%]">
+      <p class="display text-[6cqw] !leading-[1.05]">{e.title[lang]}</p>
+      <p class="mono mt-[2.5cqw] text-[3cqw]">{formatRange(e.start, e.end, lang)}</p>
+      <p class="mt-[0.6cqw] text-[2.8cqw] text-bone/80">{e.place[lang]}</p>
+      {e.gps && <p class="mono mt-[1cqw] text-[2.4cqw] text-acid">{formatGps(e.gps).join(" ")}</p>}
+    </div>
+  </div>
+</div>

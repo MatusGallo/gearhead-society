@@ -1,0 +1,60 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import PageHero from "../../components/PageHero.astro";
+import ContentRail from "../../components/ContentRail.astro";
+import { langPaths, translator, ui, type Lang, type L } from "../../i18n";
+
+export const getStaticPaths = langPaths;
+const lang = Astro.params.lang as Lang;
+const t = translator(lang);
+
+const rules: [L, L][] = [
+  [
+    { cs: "Vždy se souhlasem", en: "Consent, always" },
+    { cs: "Než se dotkneš, zeptej se. Ne znamená ne, ticho znamená ne a souhlas jde kdykoli vzít zpět.", en: "Ask before you touch. No means no, silence means no, and a yes can be taken back at any time." },
+  ],
+  [
+    { cs: "Respektuj každé tělo", en: "Respect every body" },
+    { cs: "Všechny gendery, všechna těla, všechny kinky. Rasismus, sexismus, transfobie nebo body shaming znamenají odchod.", en: "All genders, all bodies, all kinks. Racism, sexism, transphobia or body shaming get you removed." },
+  ],
+  [
+    { cs: "Na parketu se nefotí", en: "No photos on the floor" },
+    { cs: "Telefony zůstávají v kapse. Naši fotografové fotí jen ty, kdo s tím souhlasí.", en: "Phones stay in your pocket. Our official photographers only shoot people who agree to it." },
+  ],
+  [
+    { cs: "Dress code je vstupenka", en: "Dress code is the door" },
+    { cs: "Gear je povinný. Převlékárna a šatna jsou na místě, civilní oblečení jde do tašky.", en: "Gear required. Changing room and cloakroom are on site. Street clothes go in the bag." },
+  ],
+  [
+    { cs: "Dávejte na sebe pozor", en: "Look out for each other" },
+    { cs: "Necítíš se dobře, nebo vidíš někoho, komu není dobře? Najdi awareness tým (žluté pásky) nebo kohokoli ze staffu.", en: "Not feeling OK, or see someone who isn't? Find the awareness team (yellow armbands) or any staff member." },
+  ],
+  [
+    { cs: "Pouze pro dospělé", en: "Adults only" },
+    { cs: "18+ s platným dokladem s fotkou. Bez výjimek.", en: "18+ with a valid photo ID. No exceptions." },
+  ],
+];
+---
+
+<Layout lang={lang} title={ui.footer.conduct[lang]}>
+  <PageHero
+    title={ui.footer.conduct[lang]}
+    lead={t({ cs: "Tato pravidla drží noc bezpečnou pro všechny. Kdo je poruší, odchází, a to bez vrácení vstupného.", en: "These rules keep the night safe for everyone. Breaking them means leaving, without a refund." })}
+  />
+  <section class="relative mx-auto max-w-[1400px] px-4 py-16 sm:px-6 lg:pl-24">
+    <ContentRail label={ui.footer.conduct[lang]} />
+    <ol class="grid gap-px overflow-hidden border border-line bg-line md:grid-cols-2">
+      {
+        rules.map(([title, text], i) => (
+          <li class="grid grid-cols-[2.5rem_1fr] gap-4 bg-ink p-7">
+            <span class="mono text-acid">{String(i + 1).padStart(2, "0")}</span>
+            <div>
+              <h2 class="display text-2xl">{title[lang]}</h2>
+              <p class="mt-2 leading-relaxed text-bone/75">{text[lang]}</p>
+            </div>
+          </li>
+        ))
+      }
+    </ol>
+  </section>
+</Layout>

@@ -1,0 +1,162 @@
+---
+import { getImage } from "astro:assets";
+import Layout from "../../../layouts/Layout.astro";
+import Icon from "../../../components/Icon.astro";
+import Lightbox, { type LightboxItem } from "../../../components/Lightbox.astro";
+import PageHero from "../../../components/PageHero.astro";
+import ContentRail from "../../../components/ContentRail.astro";
+import Visual from "../../../components/Visual.astro";
+import { galleries, galleryCover, galleryPhotos, sommersGalleries, type Gallery } from "../../../data/galleries";
+import { site } from "../../../data/site";
+import { href, langs, locale, translator, ui, type Lang } from "../../../i18n";
+
+export function getStaticPaths() {
+  return langs.flatMap((lang) => [...galleries, ...sommersGalleries].map((gallery) => ({ params: { lang, slug: gallery.slug }, props: { gallery } })));
+}
+
+const lang = Astro.params.lang as Lang;
+const t = translator(lang);
+const { gallery } = Astro.props as { gallery: Gallery };
+const kind = ui.galleryKind[gallery.kind][lang];
+const date = new Date(`${gallery.date}T12:00:00`).toLocaleDateString(locale[lang], { day: "numeric", month: "long", year: "numeric" });
+const film = gallery.kind === "film";
+const photos = film ? [] : galleryPhotos(gallery);
+
+// Thumbnail for the grid, a large view for the lightbox, the original for the download
+const tiles = await Promise.all(
+  photos.map(async (photo, i) => {
+    const n = String(i + 1).padStart(2, "0");
+    const thumb = await getImage({ src: photo, width: Math.min(900, photo.width), format: "webp", quality: 78 });
+    const full = await getImage({ src: photo, width: Math.min(2400, photo.width), format: "webp", quality: 85 });
+    const item: LightboxItem = {
+      full: full.src,
+      download: photo.src,
+      name: `${gallery.sommers ? "" : "gearhead-"}${gallery.slug}-${n}.${photo.format}`,
+      w: photo.width,
+      h: photo.height,
+      alt: `${gallery.title}, ${t({ cs: "fotka", en: "photo" })} ${i + 1}`,
+    };
+    return { thumb: thumb.src, tw: Number(thumb.attributes.width), th: Number(thumb.attributes.height), item };
+  }),
+);
+
+const count = (n: number) =>
+  lang === "cs" ? `${n} ${n === 1 ? "fotka" : n < 5 ? "fotky" : "fotek"}` : `${n} ${n === 1 ? "photo" : "photos"}`;
+// Every shoot is delivered in one 1:1 format, so the grid is uniform; the "in progress" state shows two rows of boxes
+const pending = 8;
+const discord = site.socials.find((s) => s.label === "Discord")!.href;
+---
+
+<Layout lang={lang} theme={gallery.sommers ? "sommers" : undefined} title={`${gallery.title}, ${kind}`}>
+  <PageHero title={gallery.title} lead={`${kind}, ${date}`}>
+    <a href={href(lang, gallery.sommers ? `/sommers/${gallery.sommers}` : "/galleries")} class="mt-8 inline-flex min-h-11 items-center gap-2 text-sm text-mute hover:text-acid">
+      <Icon name="arrow-left" /> {gallery.sommers ? t({ cs: "Zpět na sraz", en: "Back to the meetup" }) : t({ cs: "Všechny galerie", en: "All galleries" })}
+    </a>
+  </PageHero>
+
+  <section class="relative mx-auto max-w-[1400px] px-4 py-14 sm:px-6 lg:pl-24">
+    <ContentRail label={gallery.title} />
+    {
+      film ? (
+        <div class="frame frame-on relative aspect-video overflow-hidden bg-coal">
+          {gallery.video ? (
+            <iframe src={gallery.video} title={`${gallery.title}, ${kind}`} class="absolute inset-0 size-full" loading="lazy" allow="fullscreen; picture-in-picture" allowfullscreen />
+          ) : (
+            <>
+              <Visual src={galleryCover(gallery)} alt="" tone="mono" fx={["lines", "grain"]} class="!absolute inset-0" />
+              <div class="absolute inset-0 grid place-content-center justify-items-center gap-5 bg-ink/40 text-center">
+                <span class="grid size-20 place-items-center border border-bone/40 text-bone/60">
+                  <Icon name="play" class="size-8" />
+                </span>
+                <p class="mono bg-ink/80 px-3 py-2 text-sm">{t({ cs: "Aftermovie připravujeme", en: "Aftermovie in the edit" })}</p>
+              </div>
+            </>
+          )}
+        </div>
+      ) : tiles.length ? (
+        <>
+          <div class="mb-6 flex flex-wrap items-baseline justify-between gap-3">
+            <p class="mono text-sm text-acid">{count(tiles.length)}</p>
+            <p class="text-sm text-mute">{t({ cs: "Klikni na fotku pro zvětšení a stažení.", en: "Click a photo to view it large and download it." })}</p>
+          </div>
+          <div class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+            {tiles.map((tile, i) => (
+              <button
+                type="button"
+                class="group frame reveal block w-full text-left"
+                data-lb-open={i}
+                aria-label={`${t({ cs: "Zobrazit", en: "View" })}: ${tile.item.alt}`}
+              >
+                <span class="relative block aspect-square overflow-hidden bg-steel">
+                  <img
+                    src={tile.thumb}
+                    width={tile.tw}
+                    height={tile.th}
+                    alt=""
+                    loading={i < 8 ? "eager" : "lazy"}
+                    decoding="async"
+                    class="absolute inset-0 size-full object-cover transition-transform duration-700 ease-(--ease-out-expo) group-hover:scale-[1.04]"
+                  />
+                  <span class="chip absolute top-0 right-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                    <Icon name="arrows-out" class="size-3.5" />
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+          <Lightbox items={tiles.map((x) => x.item)} title={`${gallery.title}, ${kind}`} lang={lang} email={site.email} />
+        </>
+      ) : (
+        <>
+          <div class="mb-8 max-w-[52ch]">
+            <h2 class="display text-2xl sm:text-3xl">{t({ cs: "Fotky se připravují", en: "Photos in progress" })}</h2>
+            <p class="mt-4 leading-relaxed text-bone/75">
+              {t({ cs: "Fotograf ještě vybírá a upravuje snímky. Jakmile budou hotové, oznámíme je na Discordu.", en: "Our photographer is still selecting and editing. We will announce the drop on Discord as soon as it is ready." })}
+            </p>
+            <a href={discord} target="_blank" rel="noopener" class="btn btn-acid mt-7">
+              Discord <Icon name="arrow-up-right" />
+            </a>
+          </div>
+          <!-- Boxes where the photos will land, so the page already shows its shape -->
+          <div class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4" aria-hidden="true">
+            {Array.from({ length: pending }, (_, i) => (
+              <div class="pending-box grid aspect-square place-items-center border border-line bg-coal" style={`--i:${i}`}>
+                <Icon name="camera" class="size-6 text-line" />
+              </div>
+            ))}
+          </div>
+        </>
+      )
+    }
+    {
+      !film && (
+        <p class="mt-10 text-sm text-mute">
+          {t({ cs: "Našel ses na fotce a chceš ji odstranit? Napiš na", en: "Spotted yourself and want the photo removed? Email" })}{" "}
+          <a href={`mailto:${site.email}`} class="text-bone underline underline-offset-4 hover:text-acid">{site.email}</a>.
+        </p>
+      )
+    }
+  </section>
+</Layout>
+
+<style>
+  /* Skeleton sweep over the empty boxes, three passes staggered by --i */
+  .pending-box {
+    position: relative;
+    overflow: hidden;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .pending-box::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(100deg, transparent 30%, rgb(242 242 242 / 0.05) 50%, transparent 70%);
+      transform: translateX(-100%);
+      animation: pending 1.8s ease-in-out 3 both;
+      animation-delay: calc(var(--i) * 0.12s);
+    }
+  }
+  @keyframes pending {
+    to { transform: translateX(100%); }
+  }
+</style>

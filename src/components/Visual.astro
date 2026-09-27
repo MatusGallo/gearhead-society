@@ -1,0 +1,71 @@
+---
+/**
+ * Image slot. Renders the photo as a graded "plate" (see .plate in global.css),
+ * otherwise a tinted placeholder.
+ *
+ * - `tone` grades the photo: "acid" / "violet" duotone, "mono" crushed greyscale,
+ *   "none" leaves it untouched (real gallery photos).
+ * - `hover` adds feedback inside a `.group`: "tone" fades the accent duotone in,
+ *   "glitch" slices the frame for a moment before toning it.
+ * - `fx` adds surface texture: grain, dot screen or scanlines.
+ */
+interface Props {
+  src?: string;
+  alt?: string;
+  hue?: number;
+  class?: string;
+  /** Extra classes on the <img>, e.g. a scroll-driven motion class */
+  imgClass?: string;
+  loading?: "eager" | "lazy";
+  /** "contain" keeps posters with text fully visible */
+  fit?: "cover" | "contain";
+  tone?: "none" | "mono" | "acid" | "violet";
+  hover?: "tone" | "glitch";
+  fx?: ("grain" | "dots" | "lines")[];
+  /** CSS object-position, for crops that need a different focal point */
+  focus?: string;
+}
+
+const {
+  src,
+  alt = "",
+  hue = 72,
+  class: cls = "",
+  imgClass = "",
+  loading = "lazy",
+  fit = "cover",
+  tone = "none",
+  hover,
+  fx = [],
+  focus,
+} = Astro.props;
+const bg = `radial-gradient(120% 90% at 20% 110%, hsl(${hue} 70% 42% / .5), transparent 60%),
+  radial-gradient(80% 70% at 90% 0%, hsl(${(hue + 40) % 360} 60% 32% / .4), transparent 65%),
+  linear-gradient(160deg, #18181c, #0b0b0d)`;
+// A hover tone on a mono plate fades the accent in; on a toned plate it is already there
+const toneClass = tone === "none" ? "" : tone === "mono" ? (hover ? "plate tone-acid tone-rest" : "plate") : `plate tone-${tone}`;
+---
+
+<div class:list={["relative overflow-hidden bg-steel", toneClass, hover && `plate-${hover}`, cls]}>
+  {
+    src ? (
+      <>
+        {fit === "contain" && (
+          <img src={src} alt="" aria-hidden="true" class="absolute inset-0 size-full scale-110 object-cover opacity-50 blur-2xl" />
+        )}
+        <img
+          src={src}
+          alt={alt}
+          loading={loading}
+          decoding="async"
+          style={focus ? `object-position:${focus}` : undefined}
+          class:list={["absolute inset-0 size-full", fit === "contain" ? "object-contain" : "object-cover", imgClass]}
+        />
+        {fx.map((f) => <span class={`plate-${f}`} aria-hidden="true" />)}
+      </>
+    ) : (
+      <div class="absolute inset-0" style={`background:${bg}`} role={alt ? "img" : undefined} aria-label={alt || undefined} aria-hidden={alt ? undefined : "true"} data-placeholder />
+    )
+  }
+  <slot />
+</div>

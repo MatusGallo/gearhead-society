@@ -1,0 +1,196 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import Icon from "../../../components/Icon.astro";
+import ContentRail from "../../../components/ContentRail.astro";
+import Countdown from "../../../components/Countdown.astro";
+import GlyphField from "../../../components/GlyphField.astro";
+import TagStrip from "../../../components/TagStrip.astro";
+import ScanField from "../../../components/ScanField.astro";
+import TicketWaves from "../../../components/TicketWaves.astro";
+import Visual from "../../../components/Visual.astro";
+import { dissolve } from "../../../data/dissolve";
+import { hudVariant } from "../../../data/hud";
+import { currentWave, dateParts, formatNumeric, formatPrice, formatTime, nextEvent, ticketLink, upcomingEvents } from "../../../data/events";
+import { href, langPaths, translator, ui, type Lang } from "../../../i18n";
+
+export const getStaticPaths = langPaths;
+const lang = Astro.params.lang as Lang;
+const t = translator(lang);
+const list = upcomingEvents();
+const next = nextEvent();
+const pad = (n: number) => String(n).padStart(2, "0");
+---
+
+<Layout lang={lang} title={ui.nav.events[lang]} description={t({ cs: "Nadcházející akce Gearhead Society, termíny a vstupenky.", en: "Upcoming Gearhead Society events, dates and tickets." })}>
+  <!-- HERO: a departure board of every date instead of a photo (the detail pages own the photo hero):
+       title and countdown, one board row per event with its sale state, the glyph field dissolving into the acid tag -->
+  <section class="relative overflow-hidden border-b border-line pt-15">
+    <div class="mx-auto grid max-w-[1400px] lg:grid-cols-[minmax(0,1fr)_auto]">
+      <div class="px-4 pt-16 pb-14 sm:px-6 sm:pt-20">
+        <h1 class="title-in display text-[clamp(3rem,9vw,6.5rem)]">{ui.nav.events[lang]}</h1>
+        <span class="rule-draw mt-8 block h-px w-full max-w-md bg-acid" aria-hidden="true"></span>
+        <div class="hero-in mt-7 flex flex-wrap items-end gap-x-10 gap-y-5">
+          <p class="max-w-[46ch] text-lg leading-relaxed text-bone/75" style="--i:2">
+            {t({ cs: "Čtyři edice ročně. Každá dá prostoru vlastní téma, zvuk a atmosféru.", en: "Four editions a year. Each one gives the venue its own theme, sound and atmosphere." })}
+          </p>
+          {next?.start && (
+            <p class="mono flex items-center gap-4 text-sm text-bone" style="--i:3">
+              <span class="flex items-center gap-2 text-xs text-acid"><span class="size-1.5 bg-acid" aria-hidden="true" />{next.title}</span>
+              <Countdown target={next.start} labels={ui.countdown[lang]} strip />
+            </p>
+          )}
+        </div>
+
+        <ol class="hero-in mono mt-12 border-t border-bone/25 text-xs sm:text-sm">
+          {list.map((e, i) => {
+            const wave = currentWave(e);
+            const state = wave ? "live" : e.start && e.tickets.length ? "soon" : "tba";
+            return (
+              <li style={`--i:${i + 4}`}>
+                <a href={`#${e.slug}`} class="group grid grid-cols-[3.25rem_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-bone/25 py-3 transition-colors hover:text-acid sm:grid-cols-[2.5rem_6rem_minmax(0,1fr)_minmax(0,14rem)_auto]">
+                  <span class="hidden text-mute sm:block">{pad(i + 1)}</span>
+                  <span class="tabular-nums">{e.start ? formatNumeric(e.start, lang).slice(0, 6) : "TBA"}</span>
+                  <span class="display truncate text-base sm:text-2xl">{e.title}</span>
+                  <span class="hidden truncate text-mute sm:block">{e.venue[lang]}</span>
+                  <span
+                    class:list={[
+                      "px-2 py-1 text-[0.65rem] whitespace-nowrap sm:text-xs",
+                      state === "live" ? "bg-acid text-ink" : "border border-line text-mute",
+                    ]}
+                  >
+                    {state === "live" ? `${wave!.name[lang]} ${formatPrice(wave!.price)}` : state === "soon" ? t({ cs: "Brzy v prodeji", en: "Coming soon" }) : "TBA"}
+                  </span>
+                </a>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+      <div class="hidden items-stretch lg:flex" aria-hidden="true">
+        <GlyphField variant={hudVariant(Astro.url.pathname, 1)} seed={next?.seed ?? 3} rows={34} cols={30} class="w-[22rem] self-end text-acid xl:w-[26rem]" />
+        <TagStrip lang={lang} variant={hudVariant(Astro.url.pathname, 1)} />
+      </div>
+    </div>
+  </section>
+
+  <!-- LIST: one cargo record per date; the photo wipes open on scroll, a live sale gets the violet ticket block -->
+  <section class="relative mx-auto max-w-[1400px] px-4 py-16 sm:px-6 lg:pl-24">
+    <ContentRail label={ui.nav.events[lang]} />
+    <ol class="border-b border-line">
+      {
+        list.map((e, i) => {
+          const d = dateParts(e.start, lang);
+          const wave = currentWave(e);
+          const buy = ticketLink(e, lang);
+          const coords = e.location?.coords;
+          const spec = [
+            [t({ cs: "Datum", en: "Date" }), formatNumeric(e.start, lang)],
+            [t({ cs: "Čas", en: "Time" }), e.start ? `${formatTime(e.start)} / ${formatTime(e.end)}` : "TBA"],
+            [t({ cs: "Místo", en: "Venue" }), `${e.venue[lang]}, ${e.city[lang]}`],
+            ...(coords ? [[t({ cs: "Souřadnice", en: "Coordinates" }), `${coords[1].toFixed(5)} N ${coords[0].toFixed(5)} E`]] : []),
+          ];
+          return (
+            <li id={e.slug} class="ev group relative scroll-mt-20 grid gap-x-10 gap-y-6 border-t border-line py-10 md:grid-cols-[6.5rem_minmax(0,1fr)_17rem]">
+              <div class="flex items-baseline gap-3 md:block">
+                <span class="mono block text-xs text-mute">{pad(i + 1)} / {pad(list.length)}</span>
+                <span class="display mt-2 block text-5xl leading-none transition-colors group-hover:text-acid">{d.day}</span>
+                <span class="mono mt-1 block text-sm text-mute">{d.month} {d.weekday}</span>
+              </div>
+
+              <div class="min-w-0">
+                <h2 class="display text-4xl leading-[0.95] sm:text-6xl">
+                  <a href={href(lang, `/events/${e.slug}`)} class="ev-title after:absolute after:inset-0 after:z-[1]">
+                    <span class="ev-name inline-flex items-start gap-3">
+                      {e.title}
+                      <Icon name="arrow-up-right" class="ev-arrow mt-1 size-8 shrink-0 text-acid sm:size-10" />
+                    </span>
+                  </a>
+                </h2>
+                <p class="mono mt-3 text-xs text-acid">{e.edition[lang]}</p>
+                <p class="mt-4 max-w-xl text-sm leading-relaxed text-bone/70">{e.summary[lang]}</p>
+                <dl class="boot-in mono mt-6 flex flex-wrap gap-x-8 gap-y-3 text-[0.7rem] leading-tight uppercase">
+                  {spec.map(([k, v], j) => (
+                    <div style={`--i:${j}`}>
+                      <dt class="text-mute">{k}</dt>
+                      <dd class="mt-1 text-bone">{v}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <TicketWaves event={e} lang={lang} class="mt-7" />
+              </div>
+
+              <div class="flex flex-col gap-4">
+                <div class="frame pointer-events-none">
+                  <div class="wipe relative overflow-hidden" style={`--i:${i % 2}`}>
+                    {e.image ? (
+                      <Visual src={e.image} alt="" tone="mono" hover="tone" fx={["lines"]} class="aspect-[16/10]" />
+                    ) : (
+                      <ScanField seed={e.seed} animate={false} labels={[]} class="aspect-[16/10]" />
+                    )}
+                  </div>
+                </div>
+                {buy && wave ? (
+                  <a href={buy} {...(e.ticketUrl ? { target: "_blank", rel: "noopener" } : {})} class="tix relative z-10 flex items-center justify-between gap-5 bg-violet px-4 py-3" style={`--dl:${dissolve(e.seed, true)}`}>
+                    <span class="grid gap-1.5">
+                      <span class="display text-xs text-acid">{wave.name[lang]} {formatPrice(wave.price)}</span>
+                      <span class="tix-box display bg-acid px-2 pt-1 pb-0.5 text-xl leading-none text-violet sm:text-2xl">{ui.buyTickets[lang]}</span>
+                    </span>
+                    <Icon name={e.ticketUrl ? "arrow-up-right" : "arrow-right"} class="tix-arrow-r tix-arrow size-6 text-acid" />
+                  </a>
+                ) : (
+                  <span class="btn btn-ghost pointer-events-none justify-between group-hover:border-acid group-hover:text-acid">
+                    {ui.eventInfo[lang]} <Icon name="arrow-right" />
+                  </span>
+                )}
+              </div>
+            </li>
+          );
+        })
+      }
+    </ol>
+  </section>
+</Layout>
+
+<style>
+  /* Card hover: acid edge draws down, the row lifts on a faint tint, the title steps right and its arrow comes in.
+     The title link covers the whole card (after:z-[1]); only the violet ticket block (z-10) sits above it. */
+  .ev::before {
+    content: "";
+    position: absolute;
+    inset: -1px -1rem 0;
+    z-index: 0;
+    pointer-events: none;
+    border-left: 2px solid var(--color-acid);
+    background: linear-gradient(90deg, color-mix(in oklab, var(--color-acid) 7%, transparent), transparent 70%);
+    opacity: 0;
+    clip-path: inset(0 0 100% 0);
+    transition: opacity 0.3s var(--ease-out-expo), clip-path 0.5s var(--ease-out-expo);
+  }
+  .ev:hover::before,
+  .ev:focus-within::before {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
+  /* Only the inner span moves: a translate on the link itself would shrink its full-card ::after to the title */
+  .ev-title { transition: color 0.25s; }
+  .ev-name { transition: translate 0.45s var(--ease-out-expo); }
+  .ev:hover .ev-title,
+  .ev:focus-within .ev-title { color: var(--color-acid); }
+  .ev:hover .ev-name,
+  .ev:focus-within .ev-name { translate: 0.5rem 0; }
+  .ev-arrow {
+    opacity: 0;
+    translate: -0.75rem 0.75rem;
+    transition: opacity 0.25s, translate 0.45s var(--ease-out-expo);
+  }
+  .ev:hover .ev-arrow,
+  .ev:focus-within .ev-arrow {
+    opacity: 1;
+    translate: 0 0;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ev::before { clip-path: none; }
+    .ev:hover .ev-name,
+    .ev:focus-within .ev-name { translate: none; }
+  }
+</style>

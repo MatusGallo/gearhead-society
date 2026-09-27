@@ -1,0 +1,160 @@
+---
+interface Props {
+  target: string;
+  /** Unit labels: days, hours, minutes, seconds */
+  labels?: [string, string, string, string];
+  /** One mono line (49D 03H 41M 12S) for HUD strips instead of the full T-minus readout */
+  compact?: boolean;
+  /** Ink-on-acid line for hero HUD strips: days in display type, then an HH:MM:SS clock */
+  strip?: boolean;
+  /** Real target time for the console header of the full readout, e.g. "14.11.2026 22:00" */
+  stamp?: string;
+}
+const { target, labels = ["Days", "Hrs", "Min", "Sec"], compact = false, strip = false, stamp } = Astro.props;
+const units = ["days", "hours", "minutes", "seconds"].map((key, i) => [key, labels[i]]);
+---
+
+{
+  strip ? (
+    <span class="countdown cds" data-target={target} role="timer" aria-live="off">
+      <span class="cds-days">
+        <span data-unit="days" class="display tabular-nums">--</span>
+        <span class="mono cds-unit">{labels[0]}</span>
+      </span>
+      <span class="mono cds-clock tabular-nums">
+        <span data-unit="hours" title={labels[1]}>--</span>
+        <span class="cds-colon" aria-hidden="true">:</span>
+        <span data-unit="minutes" title={labels[2]}>--</span>
+        <span class="cds-colon" aria-hidden="true">:</span>
+        <span data-unit="seconds" title={labels[3]}>--</span>
+      </span>
+    </span>
+  ) : compact ? (
+    <span class="countdown mono inline-flex gap-3 tabular-nums" data-target={target} role="timer" aria-live="off">
+      {units.map(([key, label]) => (
+        <span>
+          <span data-unit={key}>--</span>
+          <abbr title={label} class="no-underline opacity-60">{label[0]}</abbr>
+        </span>
+      ))}
+    </span>
+  ) : (
+    <div class="countdown cd" data-target={target} role="timer" aria-live="off">
+      <p class="mono cd-head" aria-hidden="true">
+        <span class="cd-rec"><span class="cd-dot" />T-minus</span>
+        {stamp && <span>{stamp}</span>}
+      </p>
+      <div class="cd-row">
+        {units.map(([key, label], i) => (
+          <>
+            {i > 0 && <span class="mono cd-num cd-sep" aria-hidden="true">:</span>}
+            <div>
+              <span data-unit={key} class="mono cd-num">--</span>
+              <span class="mono cd-label">{label}</span>
+            </div>
+          </>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+<script>
+  document.querySelectorAll<HTMLElement>(".countdown").forEach((el) => {
+    const target = Date.parse(el.dataset.target!);
+    const cells = Object.fromEntries(
+      [...el.querySelectorAll<HTMLElement>("[data-unit]")].map((c) => [c.dataset.unit, c]),
+    );
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const tick = () => {
+      const diff = Math.max(0, target - Date.now());
+      const s = Math.floor(diff / 1000);
+      cells.days.textContent = pad(Math.floor(s / 86400));
+      cells.hours.textContent = pad(Math.floor((s % 86400) / 3600));
+      cells.minutes.textContent = pad(Math.floor((s % 3600) / 60));
+      cells.seconds.textContent = pad(s % 60);
+    };
+    tick();
+    setInterval(tick, 1000);
+  });
+</script>
+
+<style>
+  /* Plain tactical readout: T-minus head with the real H-hour, then the digits. No panel, no glow. */
+  .cd {
+    display: grid;
+    max-width: 30rem;
+  }
+  .cd-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    font-size: 0.65rem;
+    color: var(--color-mute);
+  }
+  .cd-rec {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--color-acid);
+  }
+  .cd-dot {
+    width: 0.4rem;
+    height: 0.4rem;
+    background: currentColor;
+  }
+  .cd-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding-top: 0.75rem;
+  }
+  .cd-num {
+    display: block;
+    font-size: clamp(2.25rem, 6vw, 3.5rem);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .cd-sep {
+    color: var(--color-mute);
+  }
+  .cd-label {
+    display: block;
+    margin-top: 0.5rem;
+    font-size: 0.65rem;
+    color: var(--color-mute);
+  }
+  /* Strip variant: sits on the acid HUD bar, so everything is ink */
+  .cds {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 1rem;
+    line-height: 1;
+  }
+  .cds-days {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.4rem;
+  }
+  .cds-days .display {
+    font-size: clamp(2rem, 4.5vw, 3.25rem);
+    line-height: 0.85;
+  }
+  .cds-unit {
+    font-size: 0.75rem;
+  }
+  .cds-clock {
+    font-size: clamp(1.1rem, 2vw, 1.5rem);
+    font-weight: 500;
+  }
+  .cds-colon {
+    opacity: 0.45;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .cds-colon { animation: cd-blink 1s steps(1) infinite; }
+    .cd-dot { animation: cd-blink 1s steps(1) infinite; }
+  }
+  @keyframes cd-blink {
+    50% { opacity: 0; }
+  }
+</style>

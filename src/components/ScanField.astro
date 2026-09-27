@@ -1,0 +1,283 @@
+---
+/**
+ * Generative "surface scan" visual: contour terrain with markers, ring stacks and wireframe
+ * structures, in the spirit of the Marathon map sequences. Everything is procedural.
+ *
+ * Performance: the terrain is drawn in a Web Worker (OffscreenCanvas; main-thread fallback)
+ * about once every 1.4 s, and two canvases crossfade so it still reads as a slow morph.
+ * Everything else that moves (camera drift, pointer steering, the `world` slot) is CSS 3D
+ * on the compositor.
+ *
+ * - `animate` false renders a single still frame (small tiles, posters).
+ * - Motion pauses off-screen, on the pause button, and under reduced motion.
+ * - `slot="world"` content sits on the map plane and tilts with it (see OpsLayer.astro).
+ * - `controls={false}` hides the pause button when a parent owns playback; the parent then
+ *   dispatches `scan:pause` (detail: boolean, user pause, sets [data-paused]) or `scan:idle`
+ *   (detail: boolean, stops drawing only, e.g. while the map is hidden) on the root.
+ */
+import { rng } from "../scripts/scan-draw";
+
+interface Props {
+  /** Zone labels written onto the map */
+  labels?: string[];
+  seed?: number;
+  animate?: boolean;
+  /** Tilted perspective like an aerial map; off gives a flat plan view */
+  tilt?: boolean;
+  /** Tilt follows the pointer (--px/--py from a [data-pointer] ancestor, see Pointer.astro) */
+  steer?: boolean;
+  class?: string;
+  /** Accessible description of what the visual stands for */
+  label?: string;
+  /** Localized button labels */
+  pauseLabel?: string;
+  playLabel?: string;
+  /** Render the pause button; off when a parent controls playback */
+  controls?: boolean;
+}
+
+const {
+  labels = ["Main floor", "Gear check", "Bar", "Chill zone", "Entry"],
+  seed = 7,
+  animate = true,
+  tilt = true,
+  steer = false,
+  class: cls = "",
+  label,
+  pauseLabel = "Pause animation",
+  playLabel = "Play animation",
+  controls = true,
+} = Astro.props;
+
+// Zone labels lie flat on the map; placed from the seed so every build matches
+const r = rng(seed + 101);
+const placed = labels.map((text, i) => ({
+  text,
+  x: (8 + ((i * 23 + r() * 10) % 84)).toFixed(1),
+  y: (15 + r() * 70).toFixed(1),
+  rot: (-28 + r() * 11).toFixed(1),
+}));
+---
+
+<div
+  class:list={["scan relative overflow-hidden bg-[#050409]", cls]}
+  data-scan
+  data-seed={seed}
+  data-animate={animate ? "1" : "0"}
+  data-front="0"
+  data-pause={pauseLabel}
+  data-play={playLabel}
+  role={label ? "img" : undefined}
+  aria-label={label}
+  aria-hidden={label ? undefined : "true"}
+>
+  <div class:list={["scan-stage absolute inset-0", tilt && "scan-tilt", tilt && steer && "scan-steer"]}>
+    <div class:list={["scan-cam absolute inset-0", animate && tilt && "scan-drift"]}>
+      <canvas class="scan-canvas absolute inset-0 size-full"></canvas>
+      {animate && <canvas class="scan-canvas absolute inset-0 size-full"></canvas>}
+      <div class="scan-world absolute inset-0">
+        {
+          placed.map((p) => (
+            <span class="scan-label" style={`left:${p.x}%;top:${p.y}%;rotate:${p.rot}deg`}>
+              {p.text}
+            </span>
+          ))
+        }
+        <slot name="world" />
+      </div>
+    </div>
+  </div>
+  {animate && <div class="scan-sweep pointer-events-none absolute inset-x-0 top-0 h-24" aria-hidden="true"></div>}
+  {
+    animate && controls && (
+      <button
+        type="button"
+        class="scan-toggle absolute top-3 right-3 z-10 grid size-11 place-items-center border border-bone/30 bg-ink/75 text-bone/80 transition-colors hover:border-acid hover:text-acid"
+        aria-label={pauseLabel}
+        aria-pressed="false"
+      >
+        <svg viewBox="0 0 16 16" class="size-3.5" aria-hidden="true"><path class="i-pause" fill="currentColor" d="M3 2h3v12H3zM10 2h3v12h-3z" /><path class="i-play hidden" fill="currentColor" d="M4 2l10 6-10 6z" /></svg>
+      </button>
+    )
+  }
+  <slot />
+</div>
+
+<style>
+  .scan[data-animate="1"] {
+    container-type: size;
+  }
+  .scan-stage,
+  .scan-cam,
+  .scan-world {
+    transform-style: preserve-3d;
+  }
+  .scan-tilt {
+    transform: perspective(1400px) rotateX(38deg) scale(1.45);
+    transform-origin: 50% 40%;
+  }
+  /* Steered: the aerial view banks and pitches a few degrees with the pointer */
+  .scan-steer {
+    transform: perspective(1400px) rotateX(calc(38deg + var(--py, 0) * -6deg)) rotateZ(calc(var(--px, 0) * 4deg)) scale(1.45);
+    transition: transform 1.4s var(--ease-out-expo);
+  }
+  /* The tilted plane recedes, so its far edge and corners come into view when the camera
+     pitches, banks or drifts; the terrain bleeds past the stage so the map runs on to the horizon */
+  .scan-tilt .scan-canvas {
+    top: -45%;
+    left: -22%;
+    width: 144%;
+    height: 150%;
+  }
+  /* Two terrain frames crossfade; the worker draws into the hidden one */
+  .scan-canvas {
+    transition: opacity 1.4s linear;
+  }
+  .scan-canvas + .scan-canvas,
+  .scan[data-front="1"] .scan-canvas:first-child {
+    opacity: 0;
+  }
+  .scan[data-front="1"] .scan-canvas + .scan-canvas {
+    opacity: 1;
+  }
+  .scan-label {
+    position: absolute;
+    font: 600 12px/1 var(--font-mono);
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: rgb(242 242 242 / 0.85);
+    transform-origin: 0 100%;
+  }
+  .scan-sweep {
+    background: linear-gradient(to bottom, transparent, rgb(157 123 255 / 0.14), transparent);
+    transform: translateY(-100%);
+    animation: scan-sweep 7s linear infinite;
+  }
+  @keyframes scan-sweep {
+    to { transform: translateY(100cqh); }
+  }
+  /* Slow camera drift over the map, like a feed from a circling drone */
+  .scan-drift {
+    animation: scan-cam 38s ease-in-out infinite alternate;
+  }
+  @keyframes scan-cam {
+    from { transform: translate3d(-2.5%, 1.5%, 0) rotateZ(-1.5deg); }
+    to { transform: translate3d(2.5%, -1.5%, 0) rotateZ(1.5deg); }
+  }
+  .scan[data-paused] .scan-sweep,
+  .scan[data-paused] .scan-drift {
+    animation-play-state: paused;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .scan-steer { transform: perspective(1400px) rotateX(38deg) scale(1.45); }
+    .scan-sweep { display: none; }
+    .scan-drift { animation: none; }
+  }
+</style>
+
+<script>
+  import { createScene, DRIFT, STEP } from "../scripts/scan-draw";
+
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const offscreen = "transferControlToOffscreen" in HTMLCanvasElement.prototype;
+  let worker: Worker | undefined;
+  const byId = new Map<number, HTMLElement>();
+
+  const getWorker = () => {
+    if (!worker) {
+      worker = new Worker(new URL("../scripts/scan-worker.ts", import.meta.url), { type: "module" });
+      worker.onmessage = (e) => byId.get(e.data.id)?.setAttribute("data-front", String(e.data.front));
+    }
+    return worker;
+  };
+
+  // Fallback for browsers without OffscreenCanvas: same renderer and cadence on this thread
+  function mainThread(root: HTMLElement, canvases: HTMLCanvasElement[], seed: number, mark: string, animated: boolean) {
+    const scene = createScene(seed, mark);
+    let t = seed * 0.37, front = 0, visible = false, paused = false, timer = 0, dpr = 1;
+    const render = (i: number) => {
+      const ctx = canvases[i].getContext("2d")!;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      scene.draw(ctx, t);
+    };
+    const size = (w: number, h: number, d: number) => {
+      dpr = d;
+      for (const c of canvases) { c.width = Math.round(w * d); c.height = Math.round(h * d); }
+      scene.layout(w, h);
+      canvases.forEach((_, i) => render(i));
+    };
+    const schedule = () => {
+      clearTimeout(timer);
+      if (!animated || !visible || paused) return;
+      timer = window.setTimeout(() => {
+        t += (STEP / 1000) * DRIFT;
+        front = 1 - front;
+        render(front);
+        root.setAttribute("data-front", String(front));
+        schedule();
+      }, STEP);
+    };
+    return {
+      size,
+      visible: (v: boolean) => { visible = v; schedule(); },
+      paused: (p: boolean) => { paused = p; schedule(); },
+    };
+  }
+
+  let nextId = 0;
+  document.querySelectorAll<HTMLElement>("[data-scan]").forEach((root) => {
+    const id = nextId++;
+    byId.set(id, root);
+    const canvases = [...root.querySelectorAll<HTMLCanvasElement>(".scan-canvas")];
+    const seed = Number(root.dataset.seed) || 7;
+    const animated = root.dataset.animate === "1" && !reduce;
+    const mark = getComputedStyle(root).getPropertyValue("--scan-mark").trim() || "#c0fe04";
+    const dpr = Math.min(devicePixelRatio || 1, 1.5);
+    const box = () => [canvases[0].clientWidth, canvases[0].clientHeight] as const;
+
+    let api: { size: (w: number, h: number, d: number) => void; visible: (v: boolean) => void; paused: (p: boolean) => void };
+    if (offscreen) {
+      const w = getWorker();
+      const [cw, ch] = box();
+      const transfer = canvases.map((c) => c.transferControlToOffscreen());
+      w.postMessage({ type: "init", id, canvases: transfer, seed, mark, w: cw, h: ch, dpr, animated }, transfer);
+      api = {
+        size: (sw, sh, d) => w.postMessage({ type: "resize", id, w: sw, h: sh, dpr: d }),
+        visible: (value) => w.postMessage({ type: "visible", id, value }),
+        paused: (value) => w.postMessage({ type: "paused", id, value }),
+      };
+    } else {
+      api = mainThread(root, canvases, seed, mark, animated);
+      api.size(...box(), dpr);
+    }
+
+    let first = true;
+    new ResizeObserver(() => {
+      if (first) { first = false; return; }
+      api.size(...box(), dpr);
+    }).observe(canvases[0]);
+    new IntersectionObserver(([e]) => api.visible(e.isIntersecting)).observe(root);
+    let idle = false;
+    const sync = () => api.paused(document.hidden || idle || root.hasAttribute("data-paused"));
+    document.addEventListener("visibilitychange", sync);
+
+    const toggle = root.querySelector<HTMLButtonElement>(".scan-toggle");
+    const setPaused = (paused: boolean) => {
+      root.toggleAttribute("data-paused", paused);
+      if (toggle) {
+        toggle.setAttribute("aria-pressed", String(paused));
+        toggle.setAttribute("aria-label", (paused ? root.dataset.play : root.dataset.pause) || "");
+        toggle.querySelector(".i-pause")!.classList.toggle("hidden", paused);
+        toggle.querySelector(".i-play")!.classList.toggle("hidden", !paused);
+      }
+      sync();
+    };
+    toggle?.addEventListener("click", () => setPaused(!root.hasAttribute("data-paused")));
+    root.addEventListener("scan:pause", (e) => setPaused(Boolean((e as CustomEvent).detail)));
+    root.addEventListener("scan:idle", (e) => {
+      idle = Boolean((e as CustomEvent).detail);
+      sync();
+    });
+    if (reduce) toggle?.classList.add("hidden");
+  });
+</script>

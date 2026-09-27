@@ -1,0 +1,242 @@
+---
+/**
+ * Footer after the Marathon reference: a manifesto line, the next event as a HUD panel,
+ * link columns, a legal strip with an age badge, a stencil band (spec plate, glyph dissolve into
+ * the accent tag, all real next-event data) and the wordmark cut by the page edge.
+ * The wordmark surfaces from below as the footer scrolls in (`.surface`). A scanner window
+ * (acid scanlines over a violet ghost, styles at .scan-win in global.css) glides after the
+ * pointer with inertia and, with no pointer over it, drifts across on its own now and then.
+ */
+import CopyEmail from "./CopyEmail.astro";
+import Countdown from "./Countdown.astro";
+import Icon from "./Icon.astro";
+import Logo from "./Logo.astro";
+import GlyphField from "./GlyphField.astro";
+import SpecPlate from "./SpecPlate.astro";
+import TagStrip from "./TagStrip.astro";
+import { hudVariant } from "../data/hud";
+import { nav, site } from "../data/site";
+import { formatNumeric, formatTime, nextEvent } from "../data/events";
+import { href, ui, type Lang } from "../i18n";
+
+interface Props {
+  lang: Lang;
+}
+const { lang } = Astro.props;
+const f = ui.footer;
+const year = new Date().getFullYear();
+const next = nextEvent();
+// Stencil band varies by page: its own variant and a scatter seeded by the path (see GlyphField, TagStrip)
+const band = hudVariant(Astro.url.pathname, 3);
+const bandSeed = [...Astro.url.pathname].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 11);
+
+const legal = [
+  { label: f.conduct, path: "/code-of-conduct" },
+  { label: f.terms, path: "/terms" },
+  { label: f.privacy, path: "/privacy" },
+  { label: f.cookies, path: "/cookies" },
+  { label: f.imprint, path: "/imprint" },
+];
+const link = "inline-flex min-h-11 items-center transition-colors hover:text-acid";
+---
+
+<footer class="relative overflow-hidden bg-ink">
+  <div class="mx-auto grid max-w-[1400px] gap-10 px-4 pt-16 pb-14 sm:px-6 lg:grid-cols-[auto_1fr] lg:gap-14 lg:pt-24">
+    <p class="rail mono hidden text-xs text-mute lg:row-span-2 lg:block" aria-hidden="true">{site.name} + {site.city[lang]}</p>
+
+    <p class="mono max-w-[38ch] text-lg leading-snug text-bone sm:text-2xl sm:leading-snug">
+      <span class="text-acid" aria-hidden="true">+ </span>{f.manifesto[lang]}
+    </p>
+
+    <!-- Next event as a full-width ticket lockup: acid header with the real date and time, then violet edition rail,
+         title, countdown and the tickets block side by side (stacked on phones) -->
+    {
+      next && (
+        <a href={href(lang, `/events/${next.slug}`)} class="group relative block">
+          <span class="frame absolute inset-0" aria-hidden="true" />
+          <span class="mono flex items-center justify-between gap-4 bg-acid px-4 py-2 text-xs text-ink sm:px-5">
+            <span class="flex items-center gap-2"><span class="size-1.5 bg-ink" aria-hidden="true" />{f.next[lang]}</span>
+            <span class="tabular-nums">{formatNumeric(next.start, lang)} / {formatTime(next.start)}</span>
+          </span>
+          <span class="grid grid-cols-[2.75rem_1fr] border-x border-b border-line bg-coal lg:grid-cols-[3.5rem_minmax(0,1fr)_auto_18rem]">
+            <span class="flex items-center justify-center bg-violet py-4 lg:py-8">
+              <span class="rail display text-sm whitespace-nowrap text-acid">{next.edition[lang]}</span>
+            </span>
+            <span class="block min-w-0 self-center p-5 lg:px-8">
+              <span class="display block text-4xl leading-[0.9] sm:text-6xl">{next.title}</span>
+              <span class="mono mt-3 flex items-center gap-2 text-xs text-mute sm:text-sm">
+                <Icon name="map-pin" class="size-3.5 text-acid" />{next.venue[lang]}, {next.city[lang]}
+              </span>
+            </span>
+            <span class="col-span-2 flex items-center border-t border-line px-5 py-5 text-bone lg:col-span-1 lg:border-t-0 lg:border-l lg:px-8">
+              <Countdown target={next.start!} labels={ui.countdown[lang]} strip />
+            </span>
+            <span class="col-span-2 flex items-center justify-between gap-4 border-t border-line px-5 py-4 transition-colors duration-300 group-hover:bg-acid group-hover:text-ink lg:col-span-1 lg:flex-col lg:items-start lg:border-t-0 lg:border-l lg:py-6">
+              <span class="display text-2xl sm:text-3xl lg:text-2xl">{ui.tickets[lang]}</span>
+              <Icon name="arrow-right" class="size-6 transition-transform duration-300 group-hover:translate-x-1 lg:self-end" />
+            </span>
+          </span>
+        </a>
+      )
+    }
+  </div>
+
+  <div class="mx-auto grid max-w-[1400px] grid-cols-2 border-t border-line px-4 sm:px-6 md:grid-cols-4">
+    <nav class="border-line py-8 pr-4 md:border-r" aria-label={f.explore[lang]}>
+      <p class="mono mb-3 text-xs text-mute"><span class="text-acid">01</span> {f.explore[lang]}</p>
+      <ul class="mono text-sm">
+        {nav.map((n) => <li><a href={href(lang, n.path)} class={link}>{n.label[lang]}</a></li>)}
+      </ul>
+    </nav>
+
+    <div class="border-line py-8 md:border-r md:px-6">
+      <p class="mono mb-3 text-xs text-mute"><span class="text-acid">02</span> {f.follow[lang]}</p>
+      <ul class="mono text-sm">
+        {
+          site.socials.map((s) => (
+            <li>
+              <a href={s.href} target="_blank" rel="noopener" class:list={[link, "gap-2"]}>
+                <Icon name={s.icon} class="size-4 text-mute" />
+                {s.label}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+
+    <div class="col-span-2 border-t border-line py-8 md:col-span-1 md:border-t-0 md:border-r md:px-6">
+      <p class="mono mb-3 text-xs text-mute"><span class="text-acid">03</span> {f.contact[lang]}</p>
+      <CopyEmail lang={lang} class="inline-flex min-h-11 items-center text-sm [overflow-wrap:anywhere] hover:text-acid" />
+      <p class="mt-3 max-w-xs text-sm leading-relaxed text-mute">{site.description[lang]}</p>
+    </div>
+
+    <nav class="col-span-2 border-t border-line py-8 md:col-span-1 md:border-t-0 md:pl-6" aria-label={f.legal[lang]}>
+      <p class="mono mb-3 text-xs text-mute"><span class="text-acid">04</span> {f.legal[lang]}</p>
+      <ul class="mono text-sm">
+        {legal.map((l) => <li><a href={href(lang, l.path)} class={link}>{l.label[lang]}</a></li>)}
+        <li><button type="button" class:list={[link, "mono uppercase"]} data-consent-open>{f.cookieSettings[lang]}</button></li>
+      </ul>
+    </nav>
+  </div>
+
+  <div class="mx-auto max-w-[1400px] px-4 sm:px-6">
+    <div class="flex flex-wrap items-center gap-x-6 gap-y-4 border-t border-line py-6">
+      <Logo />
+      <div class="flex items-stretch border border-bone" title={f.ageTitle[lang]}>
+        <span class="display grid place-items-center bg-bone px-2 text-lg text-ink">18+</span>
+        <span class="mono grid place-items-center px-3 py-1.5 text-[0.7rem] leading-tight">{f.adults[lang]}</span>
+      </div>
+      <p class="mono text-xs text-mute">© {year} {site.name}</p>
+      <a href="#main" class="mono ml-auto inline-flex min-h-11 items-center gap-2 text-xs text-mute transition-colors hover:text-acid">
+        {f.backToTop[lang]}
+        <Icon name="arrow-up" class="size-4" />
+      </a>
+    </div>
+  </div>
+
+  <!-- Stencil band: cargo plate on the left, x-mark field dissolving into the accent tag on the right -->
+  <div class="mx-auto grid max-w-[1400px] border-t border-line pl-4 sm:pl-6 lg:grid-cols-[minmax(0,1fr)_auto]">
+    <SpecPlate lang={lang} variant={band} class="py-8 pr-4 sm:pr-6 lg:pr-10" />
+    <div class="flex items-stretch justify-end">
+      <GlyphField variant={band} seed={bandSeed} class="w-[17rem] self-end text-acid sm:w-[28rem] lg:w-[32rem] xl:w-[40rem]" />
+      <TagStrip lang={lang} variant={band} />
+    </div>
+  </div>
+
+  <div class="footer-mark relative mt-4 overflow-hidden select-none" aria-hidden="true">
+    <svg class="surface block w-full" viewBox="0 20 1600 86">
+      <text x="0" y="110" textLength="1600" lengthAdjust="spacingAndGlyphs" class="display" font-size="120" fill="var(--color-steel)">Gearhead Society</text>
+    </svg>
+    <div class="scan-win scan-ghost"><div class="scan-body">
+      <svg class="surface block w-full" viewBox="0 20 1600 86">
+        <text x="0" y="110" textLength="1600" lengthAdjust="spacingAndGlyphs" class="display" font-size="120" fill="var(--color-violet)">Gearhead Society</text>
+      </svg>
+    </div></div>
+    <div class="scan-win scan-lens"><div class="scan-body">
+      <svg class="surface block w-full" viewBox="0 20 1600 86">
+        <text x="0" y="110" textLength="1600" lengthAdjust="spacingAndGlyphs" class="display" font-size="120" fill="var(--color-acid)">Gearhead Society</text>
+      </svg>
+    </div></div>
+  </div>
+  <div class="h-1.5 bg-acid" aria-hidden="true"></div>
+</footer>
+
+<script>
+  // Footer scanner. Each window slides with transform while its content counter-slides, so the
+  // wordmark stays put and nothing repaints. The windows ease after a target: the pointer on
+  // hover (fine pointers), otherwise a slow pass left to right with a rest off the edge. The
+  // ghost eases slower, so it trails. Runs only while the footer is on screen; under reduced
+  // motion there is no idle pass and the lens sits under the pointer without easing.
+  const mark = document.querySelector<HTMLElement>(".footer-mark");
+  if (mark) {
+    const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const fine = matchMedia("(pointer: fine)").matches;
+    const layers = [
+      { win: mark.querySelector<HTMLElement>(".scan-lens")!, ease: reduced ? 1 : 0.06, x: -1e4 },
+      { win: mark.querySelector<HTMLElement>(".scan-ghost")!, ease: reduced ? 1 : 0.035, x: -1e4 },
+    ].map((l) => ({ ...l, body: l.win.firstElementChild as HTMLElement }));
+    const PASS = 14; // seconds to cross
+    const REST = 5; // seconds off the right edge before the next pass
+    let width = mark.clientWidth;
+    let target = -1e4;
+    let hovering = false;
+    let rest = 2;
+    let raf = 0;
+    let last = 0;
+
+    const place = (el: HTMLElement, x: number) => (el.style.transform = `translate3d(${x}px,0,0)`);
+    const jump = (x: number) => layers.forEach((l) => (l.x = x));
+
+    const frame = (now: number) => {
+      const dt = Math.min(0.05, (now - (last || now)) / 1000);
+      last = now;
+      if (!hovering && !reduced) {
+        if (rest > 0) {
+          rest -= dt;
+          if (rest <= 0) jump((target = -0.15 * width));
+        } else {
+          target += (width * 1.3 * dt) / PASS;
+          if (target > 1.15 * width) rest = REST;
+        }
+      }
+      for (const l of layers) {
+        l.x += (target - l.x) * (1 - Math.pow(1 - l.ease, dt * 60));
+        const left = l.x - l.win.offsetWidth / 2;
+        place(l.win, left);
+        place(l.body, -left);
+      }
+      raf = requestAnimationFrame(frame);
+    };
+    const run = (on: boolean) => {
+      if (on && !raf) (last = 0), (raf = requestAnimationFrame(frame));
+      if (!on && raf) cancelAnimationFrame(raf), (raf = 0);
+    };
+
+    // Hover is read from the pointer position on the whole page, not from pointerleave alone,
+    // which is skipped when the pointer leaves the window fast or the page scrolls under it
+    const leave = () => {
+      if (!hovering) return;
+      hovering = false;
+      rest = 0;
+      if (reduced) jump((target = -1e4));
+    };
+    if (fine) {
+      const track = (x: number, y: number) => {
+        const r = mark.getBoundingClientRect();
+        if (x < r.left || x > r.right || y < r.top || y > r.bottom) return leave();
+        target = x - r.left;
+        if (!hovering && layers[0].x < -0.1 * width) jump(target);
+        hovering = true;
+      };
+      let px = -1;
+      let py = -1;
+      addEventListener("pointermove", (e) => track((px = e.clientX), (py = e.clientY)), { passive: true });
+      addEventListener("scroll", () => hovering && track(px, py), { passive: true });
+      document.documentElement.addEventListener("pointerleave", leave);
+      addEventListener("blur", leave);
+    }
+    addEventListener("resize", () => (width = mark.clientWidth));
+    if (!reduced || fine) new IntersectionObserver(([e]) => run(e.isIntersecting)).observe(mark);
+  }
+</script>

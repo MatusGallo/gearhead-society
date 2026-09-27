@@ -1,0 +1,52 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import PageHero from "../../components/PageHero.astro";
+import ContentRail from "../../components/ContentRail.astro";
+import CopyEmail from "../../components/CopyEmail.astro";
+import { site } from "../../data/site";
+import { href, langPaths, translator, ui, type Lang } from "../../i18n";
+
+export const getStaticPaths = langPaths;
+const lang = Astro.params.lang as Lang;
+const t = translator(lang);
+const o = site.operator;
+const missing = t({ cs: "Doplnit", en: "To fill in" });
+
+// Rows from site.operator; empty required fields show a visible placeholder until they are filled in
+const rows = [
+  { label: t({ cs: "Provozovatel", en: "Operator" }), value: o.name, required: true },
+  { label: t({ cs: "Sídlo", en: "Registered address" }), value: o.address, required: true },
+  { label: t({ cs: "IČO", en: "Company ID (IČO)" }), value: o.id, required: true },
+  { label: t({ cs: "DIČ", en: "VAT ID (DIČ)" }), value: o.vat },
+  { label: t({ cs: "Zápis v rejstříku", en: "Register entry" }), value: o.register, required: true },
+].filter((r) => r.value || r.required);
+---
+
+<Layout lang={lang} title={ui.footer.imprint[lang]}>
+  <PageHero title={ui.footer.imprint[lang]} lead={t({ cs: "Kdo za Gearhead Society stojí a jak nás zastihnout.", en: "Who runs Gearhead Society and how to reach us." })} />
+  <section class="relative mx-auto max-w-3xl px-4 py-16 sm:px-6 lg:max-w-[54rem] lg:pl-24">
+    <ContentRail label={ui.footer.imprint[lang]} />
+    <dl class="border-t border-line">
+      {
+        rows.map((r) => (
+          <div class="grid gap-2 border-b border-line py-5 sm:grid-cols-[14rem_1fr]">
+            <dt class="mono text-xs text-mute">{r.label}</dt>
+            <dd class:list={[!r.value && "mono text-sm text-signal"]}>{r.value || missing}</dd>
+          </div>
+        ))
+      }
+      <div class="grid gap-2 border-b border-line py-5 sm:grid-cols-[14rem_1fr]">
+        <dt class="mono text-xs text-mute">E-mail</dt>
+        <dd><CopyEmail lang={lang} class="hover:text-acid" /></dd>
+      </div>
+    </dl>
+    <p class="mt-10 max-w-[65ch] leading-relaxed text-bone/75">
+      {t({ cs: "Vstupenky prodáváme podle ", en: "Tickets are sold under our " })}
+      <a href={href(lang, "/terms")} class="text-acid underline underline-offset-4 hover:text-bone">{t({ cs: "obchodních podmínek", en: "terms of sale" })}</a>.
+      {t({
+        cs: " Spotřebitelské spory řeší mimosoudně Česká obchodní inspekce (coi.cz).",
+        en: " Consumer disputes can be settled out of court by the Czech Trade Inspection Authority (coi.cz).",
+      })}
+    </p>
+  </section>
+</Layout>

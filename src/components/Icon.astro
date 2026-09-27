@@ -1,0 +1,27 @@
+---
+/** Phosphor icons (regular weight), inlined at build time. */
+const icons = import.meta.glob<string>("/node_modules/@phosphor-icons/core/assets/regular/*.svg", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+});
+
+interface Props {
+  /** Phosphor icon name, e.g. "arrow-right" */
+  name: string;
+  class?: string;
+  label?: string;
+}
+
+const { name, class: cls = "size-4", label } = Astro.props;
+const svg = icons[`/node_modules/@phosphor-icons/core/assets/regular/${name}.svg`];
+if (!svg) throw new Error(`Unknown Phosphor icon: ${name}`);
+---
+
+<span
+  class:list={["inline-block shrink-0 [&>svg]:size-full", cls]}
+  role={label ? "img" : undefined}
+  aria-label={label}
+  aria-hidden={label ? undefined : "true"}
+  set:html={svg}
+/>

@@ -1,0 +1,162 @@
+---
+/**
+ * Stencil dissolve after the Marathon footer: a field of marks that thickens into solid accent
+ * blocks, with ink marks biting back into the block edges and a few strays further out.
+ * `variant` (0..4) picks the block shape and the mark set, so the field never repeats the same
+ * way on two pages (pick it with `hudVariant()`); `seed` changes the scatter within a variant.
+ *   0 stairs   blocks climbing to the right        x / plus / dot, ring strays
+ *   1 skyline  uneven towers on a base              pixel squares dithering out, square strays
+ *   2 hang     a stepped block hanging from the top slashes / dashes / dot, plus strays
+ *   3 column   a bar up the right edge with a foot  plus / dot / fine dot, x strays
+ *   4 islands  loose slabs over a thin base         rings / dots, plus strays
+ * The right edge always counts as block, so the field runs straight into an accent strip beside it.
+ * Drawn once at build time in `currentColor`, so it follows `[data-theme]`. Purely decorative.
+ */
+interface Props {
+  variant?: number;
+  seed?: number;
+  cols?: number;
+  rows?: number;
+  class?: string;
+}
+const { variant = 0, seed = 7, cols = 44, rows = 22, class: cls = "" } = Astro.props;
+const v = ((variant % 5) + 5) % 5;
+
+let a = (seed * 2654435761 + v * 97) >>> 0;
+const rand = () => (a = (a * 1664525 + 1013904223) >>> 0) / 2 ** 32;
+const C = 10; // cell size in viewBox units
+
+// Block shape: which cells are solid
+const solid: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(false));
+const fill = (c0: number, r0: number, w: number, h: number) => {
+  for (let r = Math.max(0, r0); r < Math.min(rows, r0 + h); r++) for (let c = Math.max(0, c0); c < Math.min(cols, c0 + w); c++) solid[r][c] = true;
+};
+// Shapes take their proportions from the seed too, so two pages on the same variant still differ
+const jit = (lo: number, hi: number) => lo + rand() * (hi - lo);
+if (v === 0) {
+  const from = jit(0.2, 0.4), curve = jit(1, 1.7), tall = jit(0.5, 0.75);
+  for (let c = 0; c < cols; c++) {
+    const t = c / (cols - 1);
+    const h = t < from ? 0 : Math.floor(((t - from) / (1 - from)) ** curve * rows * tall);
+    if (h >= 3) fill(c, rows - (h - (h % 3)), 1, rows);
+  }
+} else if (v === 1) {
+  // Towers two to four cells wide, taller towards the right, a few left out
+  for (let c = Math.floor(cols * 0.3); c < cols; ) {
+    const w = 2 + Math.floor(rand() * 3);
+    const t = c / cols;
+    if (rand() > 0.2) fill(c, rows - Math.floor((0.12 + t * 0.55 + rand() * 0.25) * rows), w, rows);
+    c += w;
+  }
+  fill(Math.floor(cols * 0.45), rows - 2, cols, 2);
+} else if (v === 2) {
+  for (let c = 0; c < cols; c++) {
+    const t = c / (cols - 1);
+    const h = t < 0.45 ? 0 : Math.floor(((t - 0.45) / 0.55) ** 0.8 * rows * 0.7);
+    if (h >= 4) fill(c, 0, 1, h - (h % 4));
+  }
+  fill(cols - 4, 0, 4, rows);
+} else if (v === 3) {
+  const bar = Math.round(jit(3, 7));
+  fill(cols - bar, 0, bar, rows);
+  const foot = Math.round(jit(2, 5));
+  fill(Math.floor(cols * jit(0.45, 0.65)), rows - foot, cols, foot);
+  const shelf = Math.round(jit(3, 6));
+  fill(Math.floor(cols * jit(0.68, 0.8)), rows - foot - shelf, cols, shelf);
+  if (rand() > 0.4) fill(Math.floor(cols * jit(0.75, 0.85)), Math.floor(rows * jit(0.15, 0.35)), cols, Math.round(jit(2, 4)));
+} else {
+  const slabs = 3 + Math.floor(rand() * 2);
+  for (let i = 0; i < slabs; i++) {
+    const w = 4 + Math.floor(rand() * 6);
+    const h = 3 + Math.floor(rand() * 5);
+    fill(Math.floor(cols * (0.4 + rand() * 0.5)), Math.floor(rows * (0.12 + rand() * 0.65)), w, h);
+  }
+  fill(Math.floor(cols * 0.5), rows - 1, cols, 1);
+}
+
+// Distance in cells to the nearest solid cell (or the right edge), brute force on a small grid
+const cells: [number, number][] = [];
+solid.forEach((row, r) => row.forEach((on, c) => on && cells.push([c, r])));
+function distance(c: number, r: number) {
+  let d = cols - c;
+  for (const [sc, sr] of cells) d = Math.min(d, Math.hypot(sc - c, sr - r));
+  return d;
+}
+// How far a solid cell sits inside its block edge: 1 on the edge, up to 4
+function depth(c: number, r: number) {
+  let k = 1;
+  while (k < 4 && [[k, 0], [-k, 0], [0, k], [0, -k]].every(([dc, dr]) => solid[r + dr]?.[c + dc] ?? true)) k++;
+  return k;
+}
+
+type Kind = "x" | "plus" | "dot" | "fine" | "ring" | "sq" | "half" | "slash" | "dash";
+const sets: { near: Kind; mid: Kind; far: Kind; stray: Kind; bite: Kind; reach: number }[] = [
+  { near: "x", mid: "plus", far: "dot", stray: "ring", bite: "x", reach: 15 },
+  { near: "sq", mid: "half", far: "dot", stray: "sq", bite: "half", reach: 12 },
+  { near: "slash", mid: "dash", far: "dot", stray: "plus", bite: "slash", reach: 14 },
+  { near: "plus", mid: "dot", far: "fine", stray: "x", bite: "plus", reach: 13 },
+  { near: "ring", mid: "dot", far: "fine", stray: "plus", bite: "dot", reach: 8 },
+];
+const set = sets[v];
+
+type Mark = { c: number; r: number; k: Kind; ink?: boolean };
+const marks: Mark[] = [];
+for (let r = 0; r < rows; r++) {
+  for (let c = 0; c < cols; c++) {
+    const n = rand();
+    if (solid[r][c]) {
+      // Ink marks just inside the edge, thinning out quickly
+      if (n < 0.5 * 0.55 ** (depth(c, r) - 1)) marks.push({ c, r, k: n < 0.18 ? set.bite : "dot", ink: true });
+      continue;
+    }
+    const d = distance(c, r);
+    const p = Math.max(0, 1 - d / set.reach) ** 1.3;
+    if (n > p * 1.1) {
+      if (n > 0.9975) marks.push({ c, r, k: set.stray });
+      continue;
+    }
+    // Rings (variant 4) only hug the block edge, other near marks also mix into the middle zone
+    const edge = v === 4 ? 1.6 : 3.2;
+    marks.push({ c, r, k: d < edge && (v !== 4 || n < p * 0.75) ? set.near : d < edge ? set.mid : d < 5.5 ? (v !== 4 && n < p * 0.6 ? set.near : set.mid) : set.far });
+  }
+}
+
+// One rect per horizontal run of solid cells, overlapping a little so no seams show
+const runs: { c: number; r: number; w: number }[] = [];
+solid.forEach((row, r) => {
+  for (let c = 0; c < cols; c++) {
+    if (!row[c]) continue;
+    const start = c;
+    while (row[c + 1]) c++;
+    runs.push({ c: start, r, w: c - start + 1 });
+  }
+});
+
+const cx = (c: number) => c * C + C / 2;
+const cy = (r: number) => r * C + C / 2;
+function stroke(k: Kind, x: number, y: number) {
+  if (k === "x") return `M${x - 2.6} ${y - 2.6}l5.2 5.2M${x + 2.6} ${y - 2.6}l-5.2 5.2`;
+  if (k === "plus") return `M${x - 2.4} ${y}h4.8M${x} ${y - 2.4}v4.8`;
+  if (k === "slash") return `M${x - 2.8} ${y + 2.8}l5.6 -5.6`;
+  return `M${x - 2.4} ${y}h4.8`;
+}
+const square: Partial<Record<Kind, number>> = { sq: 7, half: 4, dot: 1.8, fine: 1.1 };
+---
+
+<svg class:list={["glyph-field block", cls]} viewBox={`0 0 ${cols * C} ${rows * C}`} preserveAspectRatio="xMaxYMax meet" aria-hidden="true">
+  <g fill="currentColor">
+    {runs.map((b) => <rect x={b.c * C} y={b.r * C} width={b.w * C + 1} height={C + 0.5} />)}
+  </g>
+  <g stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="square">
+    {
+      marks.map((m) => {
+        const x = cx(m.c), y = cy(m.r);
+        const ink = m.ink ? "var(--color-ink)" : undefined;
+        const s = square[m.k];
+        if (s) return <rect x={x - s / 2} y={y - s / 2} width={s} height={s} fill={ink ?? "currentColor"} stroke="none" opacity={m.ink || s > 4 ? 1 : 0.75} />;
+        if (m.k === "ring") return <circle cx={x} cy={y} r="2.2" stroke={ink} />;
+        return <path d={stroke(m.k, x, y)} stroke={ink} opacity={m.k === "plus" || m.k === "dash" ? 0.85 : 1} />;
+      })
+    }
+  </g>
+</svg>

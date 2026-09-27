@@ -1,0 +1,33 @@
+---
+import ScanField from "./ScanField.astro";
+import Visual from "./Visual.astro";
+import { formatNumeric, type EventItem } from "../data/events";
+import { href, ui, type Lang } from "../i18n";
+
+interface Props {
+  event: EventItem;
+  lang: Lang;
+  /** Position in its row, staggers the scroll wipe */
+  index?: number;
+}
+const { event, lang, index = 0 } = Astro.props;
+const media = "aspect-square transition-transform duration-700 ease-(--ease-out-expo) group-hover:scale-[1.04]";
+---
+
+<a href={href(lang, `/events/${event.slug}`)} class="group block">
+  <div class="frame">
+    <!-- An acid bar wipes the photo open as the card scrolls in; hover tones it -->
+    <div class="wipe relative overflow-hidden" style={`--i:${index}`}>
+      {
+        event.image ? (
+          <Visual src={event.image} alt={event.title} tone="mono" hover="tone" fx={["grain"]} class={media} />
+        ) : (
+          <ScanField seed={event.seed} animate={false} labels={ui.zones[lang].slice(0, 2)} class={media} />
+        )
+      }
+    </div>
+  </div>
+  <p class="mono mt-4 text-sm text-bone/70">{formatNumeric(event.start, lang)}</p>
+  <h3 class="display mt-1.5 text-2xl text-bone/90 transition-colors group-hover:text-acid">{event.title}</h3>
+  <p class="mono mt-2 text-xs text-mute">{event.edition[lang]}</p>
+</a>

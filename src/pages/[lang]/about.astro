@@ -1,0 +1,212 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import Icon from "../../components/Icon.astro";
+import ContentRail from "../../components/ContentRail.astro";
+import Visual from "../../components/Visual.astro";
+import { events, formatNumeric, nextEvent } from "../../data/events";
+import { ph } from "../../data/placeholder";
+import { site } from "../../data/site";
+import { href, langPaths, locale, translator, ui, type Lang } from "../../i18n";
+
+export const getStaticPaths = langPaths;
+const lang = Astro.params.lang as Lang;
+const t = translator(lang);
+const title = t({ cs: "O nás", en: "The Society" });
+const next = nextEvent();
+
+const rules = [
+  t({ cs: "Čtyři edice ročně", en: "Four editions a year" }),
+  t({ cs: "Pouze 18+", en: "Adults only" }),
+  t({ cs: "Nulová tolerance obtěžování", en: "Zero tolerance for harassment" }),
+];
+
+// The headline with two small plates set into it; numbers mark where each plate sits
+const statement: (string | number)[] = {
+  cs: ["Postavili jsme", 0, "noc, na kterou jsme", 1, "sami chtěli chodit."],
+  en: ["We built", 0, "the night we", 1, "wanted to go to."],
+}[lang];
+const chips = [
+  { src: ph("dust-backs"), tone: "acid", focus: "60% 45%" },
+  { src: ph("visor"), tone: "violet", focus: "50% 40%" },
+] as const;
+
+const manifesto = [
+  {
+    head: t({ cs: "Parta", en: "The crew" }),
+    text: t({ cs: "Gearhead Society založila malá parta DJů, fotografů a gearheadů, kteří už nechtěli vybírat mezi dobrou party a místem, kde můžou být sami sebou.", en: "Gearhead Society was founded by a small crew of DJs, photographers and gearheads who were tired of choosing between a good party and a place where they could be themselves." }),
+  },
+  {
+    head: t({ cs: "Prostor", en: "The space" }),
+    text: t({ cs: "Každá edice obsadí jiný prostor (tovární haly, sklepy, open-air plochy) a promění ho světlem, zvukem a vlastním tématem.", en: "Every edition takes over a different space (factory halls, basements, open-air lots) and transforms it with light, sound and a theme of its own." }),
+  },
+  {
+    head: t({ cs: "Lidi", en: "The crowd" }),
+    text: t({ cs: "Stejní zůstávají lidé: přijdou oblečení, dávají na sebe pozor a tančí, dokud se nerozsvítí.", en: "What stays the same is the crowd: people who dress up, look out for each other and dance until the lights come on." }),
+  },
+];
+
+// The season on a 12-month ruler, from the real editions. An edition without a date sits in its
+// season (Summer Grease: July and August) and says the date is still to be announced.
+const months = [...Array(12).keys()].map((m) => new Date(2026, m, 15).toLocaleDateString(locale[lang], { month: "short" }).replace(".", ""));
+const summer = [6, 7];
+const season = events
+  .map((e) => {
+    const m = e.start ? Number(e.start.slice(5, 7)) - 1 : summer[0];
+    return { e, from: m, span: e.start ? 1 : summer.length, when: e.start ? formatNumeric(e.start, lang) : ui.dateTba[lang] };
+  })
+  .sort((a, b) => a.from - b.from);
+
+const values = [
+  { icon: "identification-card", head: t({ cs: "Pouze 18+", en: "Adults only" }), text: t({ cs: "18+ s platným dokladem s fotkou. Bez výjimek.", en: "18+ with a valid photo ID. No exceptions." }) },
+  { icon: "hand-palm", head: t({ cs: "Vždy se souhlasem", en: "Consent, always" }), text: t({ cs: "Než se dotkneš, zeptej se. Ne znamená ne, ticho znamená ne a souhlas jde kdykoli vzít zpět.", en: "Ask before you touch. No means no, silence means no, and a yes can be taken back at any time." }) },
+  { icon: "users-three", head: t({ cs: "Každý gender", en: "Every gender" }), text: t({ cs: "Všechny gendery, všechna těla, všechny kinky. Rasismus, sexismus ani transfobie sem nepatří.", en: "All genders, all bodies, all kinks. Racism, sexism and transphobia have no place here." }) },
+];
+---
+
+<Layout lang={lang} title={ui.nav.about[lang]} description={t({ cs: "Kdo jsme a za čím Gearhead Society stojí.", en: "Who we are and what Gearhead Society stands for." })}>
+  <!-- HERO: typographic statement with small graded plates set into the line, then the lead and the house rules as a hairline index. No full-bleed photo and no rail, so it reads apart from the other heroes -->
+  <!-- TODO: placeholder CC0 stock photos until crew photos exist -->
+  <section class="relative pt-15">
+    <div class="mx-auto max-w-[1400px] px-4 pt-16 pb-20 sm:px-6 lg:pt-24">
+      <div class="mono flex items-center justify-between gap-4 border-b border-line pb-4 text-xs text-mute">
+        <h1 class="title-in display text-base text-acid sm:text-lg">{title}</h1>
+        <span class="title-in" style="--i:1">{site.name} / {site.city[lang]}</span>
+      </div>
+      <div class="title-in display mt-10 max-w-[16ch] text-[clamp(2.5rem,8vw,8rem)] !leading-[0.95] sm:mt-14" style="--i:1">
+        {statement.map((part) =>
+          typeof part === "string" ? (
+            <>{part} </>
+          ) : (
+            <><span class="ab-chip relative inline-block h-[0.72em] w-[1.8em] align-[-0.02em]" style={`--i:${part}`} aria-hidden="true">
+              <Visual src={chips[part].src} alt="" tone={chips[part].tone} fx={["grain"]} focus={chips[part].focus} loading="eager" class="size-full" />
+            </span> </>
+          ),
+        )}
+      </div>
+      <div class="mt-14 grid gap-px border border-line bg-line sm:mt-20 md:grid-cols-[1.4fr_repeat(3,1fr)]">
+        <p class="title-in bg-ink p-5 text-lg leading-relaxed text-bone/80 sm:p-6" style="--i:3">
+          {t({ cs: "Série gear a fetiš akcí z Prahy, pro každý gender a každý druh gearheada.", en: "A gear and fetish event series from Prague, for every gender and every kind of gearhead." })}
+        </p>
+        {rules.map((r, i) => (
+          <p class="title-in flex flex-col justify-between gap-6 bg-ink p-5 sm:p-6" style={`--i:${i + 4}`}>
+            <span class="mono text-xs text-acid">{String(i + 1).padStart(2, "0")}</span>
+            <span class="display text-xl leading-tight">{r}</span>
+          </p>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- MANIFESTO: three numbered beats, big numerals, each unmasks on scroll -->
+  <section class="relative mx-auto max-w-[1400px] px-4 py-24 sm:px-6 lg:pl-24">
+    <ContentRail label={title} />
+    <ol class="grid gap-px overflow-hidden border border-line bg-line md:grid-cols-3">
+      {
+        manifesto.map((m, i) => (
+          <li class="bg-ink p-6 sm:p-8">
+            <span class="heading-in display block text-[clamp(4rem,9vw,7rem)] !leading-[0.8] text-acid" aria-hidden="true">{String(i + 1).padStart(2, "0")}</span>
+            <h2 class="display mt-8 text-2xl sm:text-3xl">{m.head}</h2>
+            <p class="mt-4 max-w-[40ch] leading-relaxed text-bone/80">{m.text}</p>
+          </li>
+        ))
+      }
+    </ol>
+  </section>
+
+  <!-- SEASON: the year as a ruler, each edition flickers on at its month -->
+  <section class="bg-coal">
+    <div class="mx-auto max-w-[1400px] px-4 py-24 sm:px-6 lg:pl-24">
+      <div class="flex flex-wrap items-end justify-between gap-6">
+        <h2 class="heading-in display text-[clamp(2.25rem,6vw,4.5rem)]">{t({ cs: "Jedna sezóna, čtyři noci", en: "One season, four nights" })}</h2>
+        <a href={href(lang, "/events")} class="btn btn-ghost">{ui.nav.events[lang]} <Icon name="arrow-right" /></a>
+      </div>
+
+      <!-- Ruler from md up -->
+      <div class="mt-14 hidden md:block">
+        <ol class="mono grid grid-cols-12 border-t border-bone/30 text-xs text-mute">
+          {months.map((m, i) => (
+            <li class:list={["relative pt-3 pl-2", i > 0 && "border-l border-line"]}>
+              <span class="absolute top-0 left-0 h-3 w-px bg-bone/50" aria-hidden="true"></span>
+              {m}
+            </li>
+          ))}
+        </ol>
+        <!-- One lane per edition: a bar over its months, the label runs on over the free months beside it
+             (towards the start of the year for late editions, so it never runs off the ruler) -->
+        <ul class="boot-in relative border-b border-line bg-[linear-gradient(to_right,var(--color-line)_1px,transparent_1px)] bg-[length:calc(100%/12)_100%]">
+          {season.map(({ e, from, span, when }, i) => {
+            const late = from + span > 8;
+            const on = e === next;
+            return (
+              <li style={`--i:${i}`} class="grid grid-cols-12 py-4">
+                <span style={`grid-column:${from + 1} / span ${span}`} class:list={["row-start-1 h-1 self-start", on ? "bg-acid" : "bg-bone/40"]} aria-hidden="true"></span>
+                <a
+                  href={href(lang, `/events/${e.slug}`)}
+                  style={late ? `grid-column:1 / ${from + span + 1}` : `grid-column:${from + 1} / -1`}
+                  class:list={["group row-start-1 mt-3 flex items-baseline gap-4 px-2", late && "flex-row-reverse text-right"]}
+                >
+                  <span class:list={["display text-xl leading-tight whitespace-nowrap group-hover:text-acid", on && "text-acid"]}>{e.title}</span>
+                  <span class="mono text-[11px] whitespace-nowrap text-mute">{e.edition[lang]}</span>
+                  <span class:list={["mono text-[11px] whitespace-nowrap", on ? "text-acid" : "text-bone/70"]}>{when}</span>
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+
+      <!-- Stacked list on phones -->
+      <ul class="boot-in mt-10 divide-y divide-line border-y border-line md:hidden">
+        {season.map(({ e, from, when }, i) => (
+          <li style={`--i:${i}`}>
+            <a href={href(lang, `/events/${e.slug}`)} class="grid grid-cols-[3.5rem_1fr_auto] items-baseline gap-3 py-4">
+              <span class="mono text-xs text-mute">{months[from]}</span>
+              <span>
+                <span class:list={["display block text-lg", e === next && "text-acid"]}>{e.title}</span>
+                <span class="mono text-[11px] text-mute">{e.edition[lang]}</span>
+              </span>
+              <span class="mono text-[11px] text-bone/70">{when}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+
+  <!-- VALUES: photo plate beside the three house rules, the panel docks in from the right -->
+  <section class="mx-auto grid max-w-[1400px] items-stretch gap-10 px-4 py-24 sm:px-6 lg:grid-cols-[0.8fr_1.2fr] lg:pl-24">
+    <!-- TODO: placeholder CC0 stock photo -->
+    <div class="frame frame-on">
+      <Visual src={ph("harness")} alt="" tone="violet" hover="tone" fx={["dots"]} imgClass="settle" class="aspect-[4/5] h-full lg:aspect-auto" />
+    </div>
+    <div class="slide-in flex flex-col justify-between gap-10 border border-line p-6 sm:p-10">
+      <h2 class="display text-[clamp(2rem,4.5vw,3.5rem)] text-balance">{t({ cs: "Na parketu platí tři věci", en: "Three things hold on the floor" })}</h2>
+      <dl class="grid gap-8 sm:grid-cols-3">
+        {values.map((v) => (
+          <div>
+            <dt class="flex items-center gap-3">
+              <span class="grid size-10 place-items-center bg-acid text-ink"><Icon name={v.icon} class="size-5" /></span>
+              <span class="mono text-sm">{v.head}</span>
+            </dt>
+            <dd class="mt-4 text-sm leading-relaxed text-bone/75">{v.text}</dd>
+          </div>
+        ))}
+      </dl>
+      <a href={href(lang, "/code-of-conduct")} class="btn btn-acid self-start">{ui.footer.conduct[lang]} <Icon name="arrow-right" /></a>
+    </div>
+  </section>
+</Layout>
+
+<style>
+  /* The plates in the headline open sideways after the words land */
+  @media (prefers-reduced-motion: no-preference) {
+    .ab-chip {
+      animation: ab-open 1s var(--ease-out-expo) both;
+      animation-delay: calc(var(--i, 0) * 160ms + 450ms);
+    }
+  }
+  @keyframes ab-open {
+    from { clip-path: inset(0 50%); }
+    to { clip-path: inset(0); }
+  }
+</style>

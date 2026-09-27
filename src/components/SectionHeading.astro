@@ -1,0 +1,21 @@
+---
+import Icon from "./Icon.astro";
+
+interface Props {
+  title: string;
+  href?: string;
+  linkLabel?: string;
+}
+const { title, href, linkLabel = "View all" } = Astro.props;
+---
+
+<div class="mb-8 flex flex-wrap items-end justify-between gap-4">
+  <h2 class="heading-in display text-3xl sm:text-5xl">{title}</h2>
+  {
+    href && (
+      <a href={href} class="btn btn-ghost min-h-11 px-6 text-sm">
+        {linkLabel} <Icon name="arrow-right" class="size-4" />
+      </a>
+    )
+  }
+</div>

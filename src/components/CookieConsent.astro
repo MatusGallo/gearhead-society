@@ -1,0 +1,243 @@
+---
+/**
+ * Cookie banner. Shows on the first visit (no `gh_consent` cookie yet) and whenever a `[data-consent-open]` button is
+ * pressed (the footer's "cookie settings"). Accept and reject sit side by side at the same weight; "settings" opens the
+ * per-category switches. The choice is a first-party cookie (`v1:a1` = version 1, analytics allowed) kept for
+ * `consentCookie.days`; a new `version` asks everyone again.
+ *
+ * Optional scripts load only after consent: `site.analytics.src` is injected once analytics are allowed.
+ * Other scripts can listen for `gh:consent` on `window` (detail `{ analytics: boolean }`) or read
+ * `document.documentElement.dataset.consentAnalytics`.
+ */
+import Icon from "./Icon.astro";
+import { categories, consentCookie } from "../data/cookies";
+import { site } from "../data/site";
+import { href, translator, ui, type Lang } from "../i18n";
+
+interface Props {
+  lang: Lang;
+}
+const { lang } = Astro.props;
+const t = translator(lang);
+---
+
+<section
+  id="consent"
+  class="consent fixed inset-x-0 bottom-0 z-[60] border-2 border-acid bg-steel sm:inset-x-auto sm:bottom-5 sm:left-5 sm:w-[28rem]"
+  role="dialog"
+  aria-labelledby="consent-title"
+  aria-describedby="consent-text"
+  data-cookie={consentCookie.name}
+  data-days={consentCookie.days}
+  data-version={consentCookie.version}
+  data-analytics-src={site.analytics.src}
+  data-analytics-attrs={JSON.stringify(site.analytics.attrs)}
+  hidden
+>
+  <p class="mono flex items-center justify-between bg-acid px-4 py-2 text-xs text-ink">
+    <span id="consent-title" class="flex items-center gap-2" tabindex="-1"><Icon name="cookie" class="size-4" /> {ui.footer.cookies[lang]}</span>
+    <span aria-hidden="true">{site.name}</span>
+  </p>
+  <div class="max-h-[70dvh] overflow-y-auto p-4 sm:p-5">
+    <p id="consent-text" class="text-sm leading-relaxed text-bone">
+      {t({
+        cs: "Nezbytné cookies drží web v chodu. Anonymní statistiky zapneme jen s tvým souhlasem. Reklamní cookies nepoužíváme vůbec.",
+        en: "Necessary cookies keep the site running. Anonymous statistics only run if you allow them. We use no advertising cookies at all.",
+      })}
+      {" "}<a href={href(lang, "/cookies")} class="text-acid underline underline-offset-4 hover:text-bone">{t({ cs: "Podrobnosti", en: "Details" })}</a>
+    </p>
+
+    <form class="mt-4" data-consent-form>
+      <fieldset class="border-t border-line" hidden data-consent-details>
+        <legend class="sr-only">{ui.footer.cookieSettings[lang]}</legend>
+        {
+          categories.map((c) => (
+            <label class="flex items-start justify-between gap-4 border-b border-line py-3">
+              <span>
+                <span class="mono block text-xs">{c.name[lang]}</span>
+                <span class="mt-1 block text-xs leading-relaxed text-bone/70">{c.text[lang]}</span>
+              </span>
+              <input
+                type="checkbox"
+                name={c.id}
+                class="consent-switch mt-0.5 shrink-0"
+                checked={c.required}
+                disabled={c.required}
+                aria-describedby={c.required ? "consent-required" : undefined}
+              />
+            </label>
+          ))
+        }
+        <span id="consent-required" class="sr-only">{t({ cs: "Vždy zapnuto", en: "Always on" })}</span>
+      </fieldset>
+
+      <div class="grid grid-cols-2 gap-2" data-consent-quick>
+        <button type="button" class="btn btn-acid !px-3" data-consent="all">{t({ cs: "Přijmout vše", en: "Accept all" })}</button>
+        <button type="button" class="btn btn-slab !px-3" data-consent="none">{t({ cs: "Jen nezbytné", en: "Necessary only" })}</button>
+      </div>
+      <button type="submit" class="btn btn-acid mt-3 w-full" hidden data-consent-save>{t({ cs: "Uložit volbu", en: "Save choice" })}</button>
+      <button type="button" class="mono mt-2 inline-flex min-h-11 items-center gap-2 text-xs text-bone underline underline-offset-4 hover:text-acid" aria-expanded="false" data-consent-toggle>
+        <Icon name="plus" class="size-3.5" /> {ui.footer.cookieSettings[lang]}
+      </button>
+    </form>
+  </div>
+</section>
+
+<!-- Scrim behind the banner so it never blends into a dark page; follows the banner's hidden state -->
+<div class="consent-scrim pointer-events-none fixed inset-0 z-[59]" aria-hidden="true"></div>
+
+<style>
+  .consent {
+    box-shadow: 0 0 0 1px var(--color-ink), 0 30px 90px -10px rgb(0 0 0 / 0.95);
+  }
+  /* Accent notch on the top right corner, like the ticket stubs */
+  .consent::after {
+    content: "";
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 0.75rem;
+    height: 0.75rem;
+    background: var(--color-bone);
+  }
+  .consent-scrim {
+    display: none;
+    background: linear-gradient(to top, rgb(0 0 0 / 0.8), rgb(0 0 0 / 0.35) 45%, transparent 75%);
+  }
+  .consent:not([hidden]) + .consent-scrim { display: block; }
+
+  /* Square switch: a track with a block that slides across, accent when on */
+  .consent-switch {
+    appearance: none;
+    position: relative;
+    width: 2.5rem;
+    height: 1.25rem;
+    border: 1px solid var(--color-line);
+    background: var(--color-ink);
+    transition: background-color 0.25s var(--ease-out-expo), border-color 0.25s var(--ease-out-expo);
+  }
+  .consent-switch::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: calc(1.25rem - 6px);
+    height: calc(1.25rem - 6px);
+    background: var(--color-mute);
+    transition: transform 0.25s var(--ease-out-expo), background-color 0.25s var(--ease-out-expo);
+  }
+  .consent-switch:checked {
+    border-color: var(--color-acid);
+    background: color-mix(in oklab, var(--color-acid) 18%, transparent);
+  }
+  .consent-switch:checked::after {
+    background: var(--color-acid);
+    transform: translateX(1.25rem);
+  }
+  .consent-switch:disabled { opacity: 0.55; }
+
+  /* Docks up from the bottom edge, once per open */
+  @media (prefers-reduced-motion: no-preference) {
+    .consent:not([hidden]) { animation: consent-dock 0.5s var(--ease-out-expo) both; }
+    .consent:not([hidden]) + .consent-scrim { animation: consent-fade 0.5s ease-out both; }
+  }
+  @keyframes consent-fade {
+    from { opacity: 0; }
+  }
+  @keyframes consent-dock {
+    from { opacity: 0; transform: translateY(1.5rem); }
+    to { opacity: 1; transform: none; }
+  }
+</style>
+
+<script>
+  const box = document.getElementById("consent");
+  if (box) {
+    const { cookie = "gh_consent", days = "180", version = "1", analyticsSrc, analyticsAttrs } = box.dataset;
+    const form = box.querySelector<HTMLFormElement>("[data-consent-form]")!;
+    const details = box.querySelector<HTMLElement>("[data-consent-details]")!;
+    const quick = box.querySelector<HTMLElement>("[data-consent-quick]")!;
+    const save = box.querySelector<HTMLElement>("[data-consent-save]")!;
+    const toggle = box.querySelector<HTMLButtonElement>("[data-consent-toggle]")!;
+    const analyticsBox = form.elements.namedItem("analytics") as HTMLInputElement | null;
+    let opener: HTMLElement | null = null;
+
+    const read = (): { analytics: boolean } | undefined => {
+      const raw = document.cookie.split("; ").find((c) => c.startsWith(cookie + "="))?.split("=")[1];
+      const m = raw && decodeURIComponent(raw).match(/^v(\d+):a([01])$/);
+      return m && m[1] === version ? { analytics: m[2] === "1" } : undefined;
+    };
+
+    let loaded = false;
+    const apply = (c: { analytics: boolean }) => {
+      document.documentElement.dataset.consentAnalytics = String(c.analytics);
+      if (c.analytics && analyticsSrc && !loaded) {
+        loaded = true;
+        const s = document.createElement("script");
+        s.src = analyticsSrc;
+        s.defer = true;
+        Object.entries(JSON.parse(analyticsAttrs || "{}") as Record<string, string>).forEach(([k, v]) => s.setAttribute(k, v));
+        document.head.append(s);
+      }
+      dispatchEvent(new CustomEvent("gh:consent", { detail: c }));
+    };
+
+    const showDetails = (on: boolean) => {
+      // The hidden attribute, not a class: preflight hides [hidden] with !important over display utilities
+      details.hidden = !on;
+      quick.hidden = on;
+      save.hidden = !on;
+      toggle.hidden = on;
+      toggle.setAttribute("aria-expanded", String(on));
+    };
+
+    // Focus moves in only when a button opened it; on the first visit the page keeps focus (skip link first)
+    const open = (withDetails = false, focus = false) => {
+      const c = read();
+      if (analyticsBox) analyticsBox.checked = c?.analytics ?? false;
+      showDetails(withDetails);
+      box.hidden = false;
+      if (focus) box.querySelector<HTMLElement>("#consent-title")!.focus({ preventScroll: true });
+    };
+
+    const close = () => {
+      box.hidden = true;
+      opener?.focus({ preventScroll: true });
+      opener = null;
+    };
+
+    const choose = (analytics: boolean) => {
+      const secure = location.protocol === "https:" ? "; Secure" : "";
+      document.cookie = `${cookie}=${encodeURIComponent(`v${version}:a${analytics ? 1 : 0}`)}; Max-Age=${Number(days) * 86400}; Path=/; SameSite=Lax${secure}`;
+      // Withdrawing consent after a script has loaded takes a reload to unload it
+      const reload = loaded && !analytics;
+      apply({ analytics });
+      close();
+      if (reload) location.reload();
+    };
+
+    box.querySelectorAll<HTMLButtonElement>("[data-consent]").forEach((b) => b.addEventListener("click", () => choose(b.dataset.consent === "all")));
+    toggle.addEventListener("click", () => {
+      showDetails(true);
+      analyticsBox?.focus();
+    });
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      choose(!!analyticsBox?.checked);
+    });
+    box.addEventListener("keydown", (e) => {
+      // Escape only closes a reopened banner; the first visit needs an answer
+      if (e.key === "Escape" && read()) close();
+    });
+    document.querySelectorAll<HTMLElement>("[data-consent-open]").forEach((b) =>
+      b.addEventListener("click", () => {
+        opener = b;
+        open(true, true);
+      }),
+    );
+
+    const stored = read();
+    if (stored) apply(stored);
+    else open();
+  }
+</script>

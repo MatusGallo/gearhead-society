@@ -1,0 +1,107 @@
+---
+import { formatNumeric, formatPrice, ticketWaves, type EventItem } from "../data/events";
+import { translator, type Lang } from "../i18n";
+
+interface Props {
+  event: EventItem;
+  lang: Lang;
+  class?: string;
+}
+const { event, lang, class: className } = Astro.props;
+const t = translator(lang);
+const list = ticketWaves(event);
+const current = list.find((w) => w.state === "current");
+const prices = list.map((w) => w.price).filter((p): p is number => p != null);
+const lo = Math.min(...prices);
+const hi = Math.max(...prices);
+// Bar height 0..1: by price when known, by position otherwise, so the steps always climb
+const step = (i: number, price?: number) => (price != null && hi > lo ? (price - lo) / (hi - lo) : i / Math.max(list.length - 1, 1));
+const caption = (i: number) => {
+  const w = list[i];
+  if (w.state === "past") return t({ cs: "Vyprodáno", en: "Sold out" });
+  if (w.state === "current") return w.until ? t({ cs: `Teď, do ${formatNumeric(w.until, lang)}`, en: `Now, until ${formatNumeric(w.until, lang)}` }) : t({ cs: "Teď v prodeji", en: "On sale now" });
+  if (!current && i === 0) return t({ cs: "Brzy v prodeji", en: "Coming soon" });
+  return w.rise ? `+${w.rise} CZK` : "TBA";
+};
+---
+
+<!-- Ticket waves as a HUD price ladder: bars climb with the price, the live wave is a solid acid block -->
+{
+  list.length > 0 && (
+    <div class:list={["max-w-xl", className]}>
+      <ol class="grid grid-cols-3 items-end gap-1">
+        {list.map((w, i) => (
+          <li class:list={["wave", `is-${w.state}`]} style={`--h:${step(i, w.price)}`}>
+            <p class="mono wave-label flex gap-2 text-[0.65rem] sm:text-xs">
+              <span>{String(i + 1).padStart(2, "0")}</span>
+              <span>{w.name[lang]}</span>
+            </p>
+            <div class="wave-bar mt-2">
+              <span class="mono wave-price">{formatPrice(w.price)}</span>
+              {w.state === "current" && <span class="wave-tag" aria-hidden="true" />}
+            </div>
+            <p class="mono wave-label mt-2 text-[0.6rem] sm:text-[0.65rem]">{caption(i)}</p>
+          </li>
+        ))}
+      </ol>
+      <div class="wave-ruler mt-3" aria-hidden="true" />
+      {!current && <p class="mono mt-2 text-[0.65rem] text-mute">{t({ cs: "Nejlevněji koupíš v early bird vlně.", en: "Early bird is the cheapest wave." })}</p>}
+    </div>
+  )
+}
+
+<style>
+  .wave-label { color: var(--color-mute); }
+
+  .wave-bar {
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    height: calc(2.25rem + var(--h) * 2rem);
+    padding: 0.4rem 0.6rem;
+    border: 1px solid color-mix(in oklab, var(--color-bone) 22%, transparent);
+  }
+  .wave-price { font-size: 0.875rem; }
+  @media (min-width: 640px) {
+    .wave-price { font-size: 1rem; }
+  }
+
+  /* Sold out: hatched and struck */
+  .is-past .wave-bar {
+    border-color: var(--color-line);
+    background: repeating-linear-gradient(135deg, var(--color-line) 0 1px, transparent 1px 6px);
+  }
+  .is-past .wave-price {
+    color: var(--color-mute);
+    text-decoration: line-through;
+  }
+
+  /* Live: solid acid block, ink type, notch in the corner */
+  .is-current .wave-label { color: var(--color-acid); }
+  .is-current .wave-bar {
+    border-color: var(--color-acid);
+    background: var(--color-acid);
+    color: var(--color-ink);
+  }
+  .is-current .wave-price { font-weight: 700; }
+  .wave-tag {
+    position: absolute;
+    top: 0.4rem;
+    right: 0.4rem;
+    width: 0.5rem;
+    height: 0.5rem;
+    background: var(--color-ink);
+  }
+
+  /* Upcoming: outline only */
+  .is-next .wave-price { color: color-mix(in oklab, var(--color-bone) 60%, transparent); }
+
+  /* Tick ruler under the ladder */
+  .wave-ruler {
+    height: 6px;
+    color: var(--color-line);
+    background:
+      linear-gradient(currentColor, currentColor) bottom / 100% 1px no-repeat,
+      repeating-linear-gradient(to right, currentColor 0 1px, transparent 1px 12px) bottom / 100% 6px no-repeat;
+  }
+</style>

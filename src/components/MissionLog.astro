@@ -1,0 +1,130 @@
+---
+/**
+ * Mission log for the MissionLayer map (ScanField default slot): the event as a mission brief
+ * and a live status line per squad that switches with the squad's legs (timing
+ * shared through src/data/mission.ts). Also draws the HUD frame on the map: corner brackets and
+ * tick rulers. Real event data only.
+ */
+import { MISSION, doorKeyframes, legKeyframes, squadDelay } from "../data/mission";
+
+interface Props {
+  heading: string;
+  title: string;
+  date: string;
+  venue: string;
+  /** Opening hours, e.g. 22:00-08:00 */
+  hours?: string;
+  /** Zone names in route order */
+  route: string[];
+  /** Label for the squad status block, e.g. "Status" */
+  statusLabel: string;
+}
+const { heading, title, date, venue, hours, route, statusLabel } = Astro.props;
+const legs = route.slice(1);
+const keyframes = legs.map((_, i) => legKeyframes(`mission-leg-${i}`, i)).join("") + doorKeyframes("mission-leg-door", legs.length);
+const wp = (i: number) => `WP${String(i + 1).padStart(2, "0")}`;
+---
+
+<Fragment set:html={`<style>${keyframes}</style>`} />
+
+<!-- HUD frame: corner brackets and tick rulers along the map edges -->
+<div class="mission-frame pointer-events-none absolute inset-0 z-[5]" aria-hidden="true">
+  <span class="mf-corner mf-tl"></span>
+  <span class="mf-corner mf-tr"></span>
+  <span class="mf-corner mf-bl"></span>
+  <span class="mf-corner mf-br"></span>
+  <span class="mf-ruler mf-bottom"></span>
+  <span class="mf-ruler mf-right"></span>
+</div>
+
+<div class="mission-log mono pointer-events-none absolute top-3 left-3 z-10 max-w-[calc(100%-5rem)] text-[0.65rem] sm:top-4 sm:left-4 sm:text-xs">
+  <p class="flex items-center gap-2 text-acid"><span class="mission-rec" />{heading}</p>
+  <p class="mt-2 text-sm text-bone sm:text-base">{title} / {date}</p>
+  <p class="text-mute">{venue}{hours && ` / ${hours}`}</p>
+  <div class="mt-3 hidden border-t border-line pt-3 sm:block">
+    <p class="text-mute">{statusLabel}</p>
+    <ul class="mt-1.5 grid gap-1">
+      {
+        MISSION.squads.map((s, n) => (
+          <li class="flex items-center gap-3">
+            <span class="bg-[#ff6a2d] px-1 text-ink">SQ-{s.tag}</span>
+            <span class="mission-status relative h-[1.2em] min-w-[13rem]">
+              <span class="mission-leg" style={`--leg:mission-leg-door;--delay:${squadDelay(n)}s`}>
+                <span class="text-acid">&gt;</span> {wp(0)} {route[0]}
+              </span>
+              {legs.map((z, i) => (
+                <span class:list={["mission-leg", i === s.park - 1 && "is-park"]} style={`--leg:mission-leg-${i};--delay:${squadDelay(n)}s`}>
+                  <span class="text-acid">&gt;</span> {wp(i + 1)} {z}
+                </span>
+              ))}
+            </span>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</div>
+
+<style>
+  .mission-log {
+    padding: 0.75rem 0.9rem;
+    background: rgb(7 7 7 / 0.82);
+    border-left: 2px solid var(--color-acid);
+  }
+  .mission-rec {
+    width: 0.45rem;
+    height: 0.45rem;
+    background: var(--color-signal);
+  }
+  .mission-leg {
+    position: absolute;
+    inset: 0;
+    white-space: nowrap;
+    color: rgb(242 242 242 / 0.85);
+    opacity: 0;
+  }
+  .mission-leg.is-park {
+    opacity: 1;
+  }
+
+  .mf-corner {
+    position: absolute;
+    width: 1.1rem;
+    height: 1.1rem;
+    border: 0 solid var(--color-acid);
+  }
+  .mf-tl { top: 0.5rem; left: 0.5rem; border-width: 2px 0 0 2px; }
+  .mf-tr { top: 0.5rem; right: 0.5rem; border-width: 2px 2px 0 0; }
+  .mf-bl { bottom: 0.5rem; left: 0.5rem; border-width: 0 0 2px 2px; }
+  .mf-br { bottom: 0.5rem; right: 0.5rem; border-width: 0 2px 2px 0; }
+  .mf-ruler {
+    position: absolute;
+    color: color-mix(in oklab, var(--color-acid) 55%, transparent);
+  }
+  .mf-bottom {
+    left: 2.5rem;
+    right: 2.5rem;
+    bottom: 0.5rem;
+    height: 6px;
+    background: repeating-linear-gradient(to right, currentColor 0 1px, transparent 1px 16px);
+  }
+  .mf-right {
+    top: 4rem;
+    bottom: 2.5rem;
+    right: 0.5rem;
+    width: 6px;
+    background: repeating-linear-gradient(to bottom, currentColor 0 1px, transparent 1px 16px);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .mission-rec { animation: mission-rec 1.2s steps(1) infinite; }
+    .mission-leg {
+      animation: var(--leg) 26s linear infinite;
+      animation-delay: var(--delay);
+    }
+    :global(.scan[data-paused]) .mission-leg { animation-play-state: paused; }
+  }
+  @keyframes mission-rec {
+    50% { opacity: 0; }
+  }
+</style>

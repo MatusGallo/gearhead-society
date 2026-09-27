@@ -1,0 +1,799 @@
+@import "tailwindcss";
+@import "@fontsource-variable/archivo/wdth.css";
+@import "@fontsource-variable/chivo-mono";
+
+/* Skill docs in .claude/ contain example class names; keep them out of the build */
+@source not "../../.claude";
+
+/*
+ * Visual language inspired by marathonthegame.com (Bungie): black field, one acid accent,
+ * ultra-wide heavy grotesk for display, uppercase mono for UI text, corner brackets on frames.
+ * Archivo at 125% width stands in for their proprietary Shapiro; nothing is copied from their assets.
+ */
+@theme {
+  --color-ink: #070707;
+  --color-coal: #111111;
+  --color-steel: #1c1c1c;
+  --color-line: #2e2e2e;
+  --color-mute: #8c8c8c;
+  --color-bone: #f2f2f2;
+  --color-acid: #c0fe04;
+  --color-signal: #ff3d2e;
+  --color-violet: #5200ff;
+  /* Neutral slabs from the reference: button fill and the light panel on dark media */
+  --color-slab: #7a7a7a;
+  --color-panel: #8a8a8a;
+
+  --font-display: "Archivo Variable", "Arial Black", sans-serif;
+  --font-sans: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Chivo Mono Variable", ui-monospace, monospace;
+
+  --spacing-15: 3.75rem;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/*
+ * Z-index scale (keep to these layers only):
+ *   header 50, cookie banner 60, skip link 200
+ */
+
+/* Czech capitals carry accents (Á, Š, Ř), so display type needs more line room */
+[lang="cs"] .display {
+  line-height: 1.02;
+}
+
+/*
+ * Sommers uses the same Marathon world (black field, same components) with violet as its
+ * accent instead of acid. #5200ff is the reference's violet for blocks; #a98bff is the
+ * readable tint for text and filled buttons on black.
+ */
+[data-theme="sommers"] {
+  --color-acid: #a98bff;
+}
+
+@utility rail {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+
+@layer base {
+  /* Tailwind v4 resets buttons to the default cursor */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+  html {
+    background: var(--color-ink);
+    color: var(--color-bone);
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    scrollbar-color: var(--color-line) var(--color-ink);
+    caret-color: var(--color-acid);
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background: var(--color-ink);
+    min-height: 100dvh;
+    overflow-x: hidden;
+  }
+
+  ::selection {
+    background: var(--color-acid);
+    color: var(--color-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-acid);
+    outline-offset: 3px;
+  }
+}
+
+@layer components {
+  /* Ultra-wide heavy grotesk */
+  .display {
+    font-family: var(--font-display);
+    font-stretch: 125%;
+    font-weight: 850;
+    text-transform: uppercase;
+    line-height: 0.9;
+    letter-spacing: -0.015em;
+  }
+
+  /* Uppercase mono used for nav, labels, dates and short UI copy */
+  .mono {
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-mute);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    min-height: 3.25rem;
+    padding: 0 1.75rem;
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    transition: background-color 0.3s var(--ease-out-expo), color 0.3s var(--ease-out-expo),
+      border-color 0.3s var(--ease-out-expo), transform 0.3s var(--ease-out-expo);
+  }
+  .btn:active { transform: scale(0.98); }
+
+  .btn-acid {
+    background: var(--color-acid);
+    color: var(--color-ink);
+  }
+  .btn-acid:hover { background: var(--color-bone); }
+
+  .btn-ghost {
+    border: 1px solid var(--color-line);
+    color: var(--color-bone);
+  }
+  .btn-ghost:hover {
+    border-color: var(--color-acid);
+    color: var(--color-acid);
+  }
+
+  /* Solid light slab button, like the EXPLORE buttons on the reference (bone, not grey: grey read as disabled) */
+  .btn-slab {
+    background: var(--color-bone);
+    color: var(--color-ink);
+  }
+  .btn-slab:hover { background: var(--color-acid); }
+
+  /*
+   * Violet ticket block with the label knocked out of an acid box, after the Marathon/Nightfall lockup.
+   * Pixel dissolve tiles come in as --dl / --dr (see src/data/dissolve.ts); leave one unset for one side only.
+   */
+  .tix-box,
+  .tix-arrow {
+    transition: background-color 0.25s var(--ease-out-expo), translate 0.35s var(--ease-out-expo);
+  }
+  .tix:hover .tix-box { background: var(--color-bone); }
+  .tix:hover .tix-arrow { translate: 0 3px; }
+  .tix:hover .tix-arrow-r { translate: 3px 0; }
+  @media (min-width: 768px) {
+    .tix::before,
+    .tix::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 90px;
+      pointer-events: none;
+      background-repeat: repeat-y;
+    }
+    .tix::before { right: 100%; background-image: var(--dl, none); background-position: right top; }
+    .tix::after { left: 100%; background-image: var(--dr, none); background-position: left top; }
+  }
+  /* Optional break-up above and below: <span class="tix-v tix-up"> / <span class="tix-v tix-down"> inside the block */
+  .tix-v {
+    position: absolute;
+    inset-inline: 0;
+    pointer-events: none;
+    background-repeat: repeat-x;
+  }
+  .tix-up { bottom: 100%; height: 40px; background-image: var(--dt, none); background-position: left bottom; }
+  .tix-down { top: 100%; height: 25px; background-image: var(--dbm, none); background-position: left top; }
+
+  /* Bottom edge that crumbles into pixels; the band tile comes in as --db (dissolveDown in src/data/dissolve.ts) */
+  .dissolve-b {
+    mask-image: linear-gradient(#000, #000), var(--db);
+    mask-size: 100% calc(100% - 144px), auto 144px;
+    mask-position: top, bottom left;
+    mask-repeat: no-repeat, repeat-x;
+  }
+
+  /*
+   * Corner brackets around a frame. Drawn with background gradients, no extra markup.
+   * Always visible with .frame-on, otherwise they appear on hover of the nearest .group.
+   */
+  .frame {
+    position: relative;
+  }
+  .frame::after {
+    --c: var(--color-acid);
+    --l: 14px;
+    content: "";
+    position: absolute;
+    inset: -7px;
+    pointer-events: none;
+    opacity: 0;
+    transform: scale(0.97);
+    transition: opacity 0.35s var(--ease-out-expo), transform 0.35s var(--ease-out-expo);
+    background:
+      linear-gradient(var(--c), var(--c)) top left / var(--l) 1px no-repeat,
+      linear-gradient(var(--c), var(--c)) top left / 1px var(--l) no-repeat,
+      linear-gradient(var(--c), var(--c)) top right / var(--l) 1px no-repeat,
+      linear-gradient(var(--c), var(--c)) top right / 1px var(--l) no-repeat,
+      linear-gradient(var(--c), var(--c)) bottom left / var(--l) 1px no-repeat,
+      linear-gradient(var(--c), var(--c)) bottom left / 1px var(--l) no-repeat,
+      linear-gradient(var(--c), var(--c)) bottom right / var(--l) 1px no-repeat,
+      linear-gradient(var(--c), var(--c)) bottom right / 1px var(--l) no-repeat;
+  }
+  .frame-on::after,
+  .group:hover .frame::after,
+  .group:focus-visible .frame::after {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* Small dark chip with icon + mono label, sits on the top-left of a media tile */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.25rem 0.5rem;
+    background: color-mix(in oklab, var(--color-ink) 82%, transparent);
+    color: var(--color-bone);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  /*
+   * Photo plates. Sources are greyscale with crushed blacks (public/images); the colour is
+   * graded here so the duotone follows the section accent ([data-theme="sommers"] turns acid
+   * into violet). Duotone: multiply paints the highlights, lighten lifts the blacks.
+   */
+  .plate {
+    isolation: isolate;
+    background: var(--color-ink);
+  }
+  .plate > img {
+    filter: grayscale(1) contrast(1.12);
+  }
+  .plate::before,
+  .plate::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    transition: opacity 0.5s var(--ease-out-expo);
+  }
+  .tone-acid { --tone-hi: var(--color-acid); --tone-lo: #0b0d03; }
+  .tone-violet { --tone-hi: #cdbfff; --tone-lo: #1d0070; }
+  .tone-acid::before,
+  .tone-violet::before {
+    background: var(--tone-hi);
+    mix-blend-mode: multiply;
+  }
+  .tone-acid::after,
+  .tone-violet::after {
+    background: var(--tone-lo);
+    mix-blend-mode: lighten;
+  }
+  /* Mono at rest, accent duotone as hover feedback */
+  .tone-rest::before,
+  .tone-rest::after { opacity: 0; }
+  .group:hover .tone-rest::before,
+  .group:hover .tone-rest::after,
+  .group:focus-visible .tone-rest::before,
+  .group:focus-visible .tone-rest::after { opacity: 1; }
+
+  /* Surface texture, static: grain, halftone dot screen, scanlines */
+  .plate-grain,
+  .plate-dots,
+  .plate-lines {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+  }
+  .plate-grain {
+    opacity: 0.2;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 1.6 -.3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .plate-dots {
+    opacity: 0.7;
+    background: radial-gradient(circle, transparent 0.8px, rgb(7 7 7 / 0.75) 1.5px) 0 0 / 4px 4px;
+  }
+  .plate-lines {
+    background: repeating-linear-gradient(to bottom, rgb(7 7 7 / 0.4) 0 1px, transparent 1px 3px);
+  }
+  .plate > :not(img, [class^="plate-"]) { z-index: 3; }
+
+  /*
+   * Hero plate (HeroPlate.astro). Pointer vars come from the nearest [data-pointer]:
+   * --x/--y in px for the lens and reticle, --px/--py from -1 to 1 for depth.
+   */
+  [data-pointer] {
+    --x: 50%;
+    --y: 45%;
+    --px: 0;
+    --py: 0;
+  }
+  /*
+   * Hero photo layers are full-width images with blend modes, so they stay still: moving them
+   * with the pointer re-composited ~3000 px of blended layers per frame and stuttered on wide
+   * screens. Depth now comes from the outline numeral and the load-in register slide only.
+   */
+  .hp-depth {
+    transform: none;
+  }
+  /* Hero sources are pre-graded greyscale; skip the per-pixel filter on the big image */
+  .hero-plate .plate:not(.hp-ghost) > img {
+    filter: none;
+  }
+  /* Violet copy screened out of register, like a misprinted poster */
+  .hero-plate .hp-ghost {
+    --tone-hi: #7b52ff;
+    --tone-lo: #000;
+    mix-blend-mode: screen;
+    opacity: 0.6;
+    transform: translate(7px, -3px);
+  }
+  /* Only the highlights of the copy print, so the blacks of the base stay deep */
+  .hero-plate .hp-ghost > img {
+    filter: grayscale(1) contrast(2.6) brightness(0.62);
+  }
+  /* Overlay box with the photo's own size and crop (object-fit: cover at --fx/--fy) */
+  .hp-map {
+    --w: max(100cqw, 100cqh * var(--ar));
+    --h: max(100cqh, 100cqw / var(--ar));
+    position: absolute;
+    width: var(--w);
+    height: var(--h);
+    left: calc((100cqw - var(--w)) * var(--fx));
+    top: calc((100cqh - var(--h)) * var(--fy));
+  }
+  /* Inline style only carries --dfx/--dfy (desktop) and --mfx/--mfy (phones); CSS picks one */
+  .hero-plate {
+    --fx: var(--dfx, 0.5);
+    --fy: var(--dfy, 0.5);
+  }
+  @media (max-width: 639px) {
+    .hero-plate {
+      --fx: var(--mfx, var(--dfx, 0.5));
+      --fy: var(--mfy, var(--dfy, 0.5));
+    }
+  }
+
+  /*
+   * Tracking boxes on a hero photo, like object detection on a live feed: brackets lock on,
+   * the bracket label types out. Labels only carry real event data.
+   */
+  .track {
+    --c: var(--color-acid);
+    position: absolute;
+    z-index: 3;
+    background:
+      linear-gradient(var(--c), var(--c)) top left / 18px 2px no-repeat,
+      linear-gradient(var(--c), var(--c)) top left / 2px 18px no-repeat,
+      linear-gradient(var(--c), var(--c)) top right / 18px 2px no-repeat,
+      linear-gradient(var(--c), var(--c)) top right / 2px 18px no-repeat,
+      linear-gradient(var(--c), var(--c)) bottom left / 18px 2px no-repeat,
+      linear-gradient(var(--c), var(--c)) bottom left / 2px 18px no-repeat,
+      linear-gradient(var(--c), var(--c)) bottom right / 18px 2px no-repeat,
+      linear-gradient(var(--c), var(--c)) bottom right / 2px 18px no-repeat;
+    outline: 1px dashed color-mix(in oklab, var(--c) 35%, transparent);
+    outline-offset: -1px;
+  }
+  .track-tag {
+    position: absolute;
+    top: 0;
+    left: calc(100% + 0.6rem);
+    display: grid;
+    padding: 0.3rem 0.5rem;
+    background: rgb(7 7 7 / 0.78);
+    color: var(--color-acid);
+    font: 500 11px/1.4 var(--font-mono);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  /* Orange box, for a second read in the structure colour of the ops map */
+  .track-hot { --c: #ff6a2d; }
+  .track-hot .track-tag { color: #ffb08a; }
+  /* Home hero: tritone grade, violet shadows under the acid highlights, a stronger violet copy,
+     and heat in the smoke (orange) with a violet wash behind the headline */
+  .hero-tri .hero-plate .plate:not(.hp-ghost) { --tone-lo: #1c0b55; }
+  .hero-tri .hero-plate .hp-ghost { opacity: 0.85; }
+  .hero-tri .hp-heat {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    mix-blend-mode: screen;
+    background:
+      radial-gradient(ellipse 30% 36% at 50% 50%, rgb(255 106 45 / 0.34), transparent 70%),
+      radial-gradient(ellipse 60% 55% at 0% 100%, rgb(82 0 255 / 0.45), transparent 70%);
+  }
+  /* Tag level with the bottom of the box, for subjects near the top edge */
+  .track-low .track-tag {
+    top: auto;
+    bottom: 0;
+  }
+  /* Tag on the left of the box, for subjects near the right edge */
+  .track-flip .track-tag {
+    left: auto;
+    right: calc(100% + 0.6rem);
+    text-align: right;
+  }
+  .track-time {
+    position: absolute;
+    bottom: -0.2rem;
+    left: 0;
+    translate: 0 100%;
+    padding: 0.2rem 0.45rem;
+    background: var(--color-signal);
+    color: var(--color-ink);
+    font: 600 11px/1.3 var(--font-mono);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  /* Giant outlined numeral behind hero content (Sommers edition number) */
+  .outline-num {
+    color: transparent;
+    -webkit-text-stroke: 1.5px color-mix(in oklab, var(--color-acid) 70%, transparent);
+    transform: translate(calc(var(--px, 0) * -18px), calc(var(--py, 0) * -12px));
+    transition: transform 1.2s var(--ease-out-expo);
+  }
+  /* Home hero date and district: fixed in place, no pointer drift */
+  .outline-num.still {
+    transform: none;
+    transition: none;
+  }
+
+  /* Map target: square rings around a point, with a label for the real place */
+  .target-ring {
+    position: absolute;
+    inset: 0;
+    border: 1px solid var(--color-acid);
+  }
+
+  /* Footer wordmark scanner: a window about one letter wide shows the wordmark in acid
+     scanlines over a wider violet ghost out of register. Footer.astro moves the windows with
+     transform only (each window slides, its content counter-slides), so nothing repaints. */
+  .footer-mark { container-type: inline-size; }
+  .scan-win {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: var(--w);
+    overflow: hidden;
+    pointer-events: none;
+    mask-image: linear-gradient(to right, transparent, #000 25%, #000 75%, transparent);
+    transform: translate3d(-120cqw, 0, 0);
+    will-change: transform;
+  }
+  .scan-lens { --w: 9cqw; }
+  .scan-ghost { --w: 14cqw; }
+  .scan-body {
+    width: 100cqw;
+    will-change: transform;
+  }
+  .scan-lens svg { mask-image: repeating-linear-gradient(#000 0 3px, transparent 3px 5px); }
+  .scan-ghost svg { translate: -0.35cqw -2%; }
+}
+
+/*
+ * Motion. Each part of the page has its own gesture, so no entrance repeats everywhere:
+ *   load    .hero-in (copy rises, home hero), .title-in (masked title, sub-page heroes),
+ *           .rule-draw (acid rule draws out), .plate-fade (hero photo fades in),
+ *           .roll (Sommers edition number rolls up like an odometer),
+ *           .develop (contact sheet frames develop from overexposed, galleries hero),
+ *           .tune-in (contact channels lock on one by one, stepped left to right)
+ *   scroll  .heading-in (section title unmasks), .wipe (acid bar wipes a card open),
+ *           .settle (photo zooms to rest), .drift (parallax along a horizontal strip),
+ *           .parallax (full-bleed photo drifts),
+ *           .boot-in (readout flickers on), .slide-in (panel docks from the right),
+ *           .reveal (Sommers statement), .surface (footer wordmark rises out of the page edge)
+ *   click   .load-in (loaded cards drop in behind an accent scan bar, staggered by --i)
+ *   idle    footer scanner glides across the wordmark when no pointer is over it (script, Footer.astro)
+ *   hover   .frame brackets, .tone-rest duotone, .plate-glitch slice
+ * Load and scroll motion and the glitch are off under reduced motion; colour and
+ * bracket feedback on hover stays, as it never moves layout.
+ */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(28px); }
+  to { opacity: 1; transform: none; }
+}
+/* Negative insets leave room for Czech accents and descenders outside the line box */
+@keyframes unmask {
+  from { clip-path: inset(100% -0.2em -0.3em -0.2em); transform: translateY(35%); }
+  to { clip-path: inset(-0.3em -0.2em -0.3em -0.2em); transform: none; }
+}
+@keyframes trace {
+  from { transform: translateX(-50%) scaleY(0); }
+  to { transform: translateX(-50%) scaleY(1); }
+}
+@keyframes draw {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+@keyframes fade {
+  from { opacity: 0; }
+}
+@keyframes wipe-bar {
+  0% { transform: scaleX(0); transform-origin: left; }
+  45% { transform: scaleX(1); transform-origin: left; }
+  46% { transform: scaleX(1); transform-origin: right; }
+  100% { transform: scaleX(0); transform-origin: right; }
+}
+@keyframes wipe-clip {
+  0%, 45% { clip-path: inset(0 100% 0 0); }
+  46%, 100% { clip-path: inset(0); }
+}
+@keyframes settle {
+  from { transform: scale(1.22); }
+  to { transform: scale(1.02); }
+}
+@keyframes drift {
+  from { transform: scale(1.18) translateX(7%); }
+  to { transform: scale(1.18) translateX(-7%); }
+}
+@keyframes parallax {
+  from { transform: scale(1.15) translateY(-6%); }
+  to { transform: scale(1.15) translateY(6%); }
+}
+@keyframes flicker {
+  0% { opacity: 0; }
+  30% { opacity: 0.9; }
+  36% { opacity: 0.15; }
+  55% { opacity: 1; color: var(--color-acid); }
+  62% { opacity: 0.4; }
+  100% { opacity: 1; }
+}
+@keyframes dock {
+  from { opacity: 0; transform: translateX(28%); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes register {
+  from { translate: 48px -18px; opacity: 0; }
+  to { translate: 0 0; }
+}
+@keyframes ping {
+  from { transform: scale(1); opacity: 1; }
+  to { transform: scale(3.2); opacity: 0; }
+}
+/* Brackets search, overshoot and lock onto the subject */
+@keyframes acquire {
+  0% { opacity: 0; transform: scale(1.6) translate(6%, -4%); }
+  40% { opacity: 1; transform: scale(1.18) translate(-3%, 2%); }
+  70% { transform: scale(0.96); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes type-out {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0); }
+}
+@keyframes surface {
+  from { transform: translateY(55%); }
+  to { transform: none; }
+}
+@keyframes develop {
+  from { opacity: 0; filter: brightness(3.2) contrast(0.4); }
+  60% { opacity: 1; }
+  to { opacity: 1; filter: none; }
+}
+/* A channel locking on: the row opens in steps, dips once, then holds */
+@keyframes tune {
+  0% { clip-path: inset(0 100% 0 0); opacity: 1; }
+  60% { clip-path: inset(0); opacity: 1; }
+  70% { opacity: 0.35; }
+  100% { clip-path: inset(0); opacity: 1; }
+}
+@keyframes roll {
+  from { transform: translateY(0); }
+  to { transform: translateY(calc(var(--n) * -1em)); }
+}
+@keyframes load-clip {
+  from { clip-path: inset(0 0 100% 0); transform: translateY(-16px); }
+  to { clip-path: inset(0 0 -1px 0); transform: none; }
+}
+/* The bar sits on the bottom edge of a full-size layer, so it rides the clip edge down */
+@keyframes load-bar {
+  from { transform: translateY(-100%); opacity: 1; }
+  80% { opacity: 1; }
+  to { transform: none; opacity: 0; }
+}
+@keyframes glitch {
+  0% { clip-path: inset(0); transform: none; }
+  20% { clip-path: inset(14% 0 56% 0); transform: translateX(-7px); }
+  40% { clip-path: inset(58% 0 12% 0); transform: translateX(6px); }
+  60% { clip-path: inset(30% 0 38% 0); transform: translateX(-3px); }
+  80% { clip-path: inset(0 0 72% 0); transform: translateX(2px); }
+  100% { clip-path: inset(0); transform: none; }
+}
+
+/* Programme timeline rail: hairline, with an accent trace that fills down it on scroll */
+.trace { --rail: 3.75rem; }
+@media (min-width: 40rem) { .trace { --rail: 5rem; } }
+.trace::before,
+.trace::after {
+  content: "";
+  position: absolute;
+  left: var(--rail);
+  top: 1.2rem;
+  bottom: 1.2rem;
+  width: 1px;
+  transform: translateX(-50%);
+  background: var(--color-line);
+}
+.trace::after {
+  background: var(--color-acid);
+  transform-origin: top;
+}
+
+/* Load-more button: idle and busy labels share one spot, the bar fills while the next page loads */
+.more-btn .more-busy { display: none; }
+.more-btn[data-state="busy"] .more-idle { display: none; }
+.more-btn[data-state="busy"] .more-busy { display: inline; }
+.more-btn .more-bar {
+  position: absolute;
+  inset: auto 0 0;
+  height: 3px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+}
+.more-btn[data-state="busy"] { cursor: progress; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .hero-in > * {
+    animation: rise 0.9s var(--ease-out-expo) both;
+    animation-delay: calc(var(--i, 0) * 110ms + 80ms);
+  }
+  .develop {
+    animation: develop 1.6s var(--ease-out-expo) both;
+    animation-delay: calc(var(--i, 0) * 130ms + 300ms);
+  }
+  .tune-in > * {
+    animation: tune 0.8s steps(10, end) both;
+    animation-delay: calc(var(--i, 0) * 160ms + 450ms);
+  }
+  .roll .roll-strip {
+    animation: roll 1.4s var(--ease-out-expo) both;
+    animation-delay: calc(var(--i, 0) * 140ms + 250ms);
+  }
+  .title-in {
+    animation: unmask 1s var(--ease-out-expo) both;
+    animation-delay: calc(var(--i, 0) * 120ms + 60ms);
+  }
+  .rule-draw {
+    transform-origin: left;
+    animation: draw 1.1s var(--ease-out-expo) 0.35s both;
+  }
+  /* backwards, not both: after the boot the image drops the filter instead of keeping it */
+  .plate-fade > img {
+    animation: fade 0.9s var(--ease-out-expo) backwards;
+  }
+  .char-in > span {
+    display: inline-block;
+    animation: unmask 0.8s var(--ease-out-expo) both;
+    animation-delay: calc(var(--i, 0) * 40ms + 250ms);
+  }
+  /* The violet copy slides into register as the hero powers on */
+  .hero-plate .hp-ghost {
+    animation: register 1.4s var(--ease-out-expo) 0.2s backwards;
+  }
+  .track {
+    animation: acquire 0.9s steps(6, end) both;
+    animation-delay: calc(var(--i, 0) * 0.35s + 1.3s);
+  }
+  .track-tag,
+  .track-time {
+    animation: type-out 0.8s steps(22, end) both;
+    animation-delay: calc(var(--i, 0) * 0.35s + 2s);
+  }
+  .target-ring {
+    animation: ping 2.4s var(--ease-out-expo) 3 both;
+    animation-delay: calc(var(--i, 0) * 0.5s + 0.8s);
+  }
+  .load-in {
+    position: relative;
+    animation: load-clip 0.9s var(--ease-out-expo) both;
+    animation-delay: calc(var(--i, 0) * 140ms);
+  }
+  .load-in::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    border-bottom: 3px solid var(--color-acid);
+    pointer-events: none;
+    animation: load-bar 0.9s var(--ease-out-expo) both;
+    animation-delay: calc(var(--i, 0) * 140ms);
+  }
+  .more-btn[data-state="busy"] .more-bar {
+    animation: draw 0.75s var(--ease-out-expo) both;
+  }
+  .group:hover .plate-glitch {
+    animation: glitch 0.45s steps(1, end);
+  }
+
+  @supports (animation-timeline: view()) {
+    .reveal {
+      animation: rise linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 55%;
+    }
+    .heading-in {
+      animation: unmask linear both;
+      animation-timeline: view();
+      animation-range: entry 10% entry 90%;
+    }
+    /* --i staggers cards that enter together */
+    .wipe > *,
+    .wipe::before {
+      animation-timeline: view();
+      animation-range: entry calc(var(--i, 0) * 9%) cover calc(30% + var(--i, 0) * 7%);
+    }
+    .wipe > * {
+      animation-name: wipe-clip;
+      animation-timing-function: linear;
+      animation-fill-mode: both;
+    }
+    .wipe::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      background: var(--color-acid);
+      animation-name: wipe-bar;
+      animation-timing-function: linear;
+      animation-fill-mode: both;
+    }
+    .settle {
+      animation: settle linear both;
+      animation-timeline: view();
+      animation-range: entry 0% cover 55%;
+    }
+    .drift {
+      animation: drift linear both;
+      animation-timeline: view(inline);
+    }
+    .parallax {
+      animation: parallax linear both;
+      animation-timeline: view();
+    }
+    .boot-in > * {
+      animation: flicker linear both;
+      animation-timeline: view();
+      animation-range: entry calc(20% + var(--i, 0) * 6%) entry calc(60% + var(--i, 0) * 6%);
+    }
+    .slide-in {
+      animation: dock linear both;
+      animation-timeline: view();
+      /* Ends on entry: this panel sits near the page end, where cover ranges never finish */
+      animation-range: entry 0% entry 100%;
+    }
+    .trace::after {
+      animation: trace linear both;
+      animation-timeline: view();
+      animation-range: entry 60% cover 70%;
+    }
+    .surface {
+      animation: surface linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 100%;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .frame::after { transform: none; }
+  .hp-depth,
+  .hero-plate .hp-ghost,
+  .outline-num { transform: none; }
+  .target-ring { display: none; }
+}

@@ -1,0 +1,132 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import PageHero from "../../components/PageHero.astro";
+import ContentRail from "../../components/ContentRail.astro";
+import LegalList from "../../components/LegalList.astro";
+import { operatorLine, site } from "../../data/site";
+import { langPaths, translator, ui, type Lang, type L } from "../../i18n";
+
+export const getStaticPaths = langPaths;
+const lang = Astro.params.lang as Lang;
+const t = translator(lang);
+
+// TODO: mock copy, have it reviewed by a lawyer and fill in the operator before launch
+const sections: [L, L<string[]>][] = [
+  [
+    { cs: "Kdo data zpracovává", en: "Who handles your data" },
+    {
+      cs: [
+        "Správcem osobních údajů je " + operatorLine("cs") + ". Na ochranu soukromí se nás můžeš kdykoli zeptat na " + site.email + ".",
+        "Data sbíráme jen tolik, kolik potřebujeme k pořádání akcí. Neprodáváme je a nikomu je nedáváme k marketingu.",
+      ],
+      en: [
+        "The data controller is " + operatorLine("en") + ". Privacy questions go to " + site.email + " at any time.",
+        "We only collect what we need to run our events. We never sell your data or hand it to anyone for marketing.",
+      ],
+    },
+  ],
+  [
+    { cs: "Co o tobě víme", en: "What we know about you" },
+    {
+      cs: [
+        "Vstupenky: jméno, e-mail, poznámka z objednávky a údaje o platbě (částka, datum, variabilní symbol). Číslo karty nikdy nevidíme.",
+        "Kontakt a registrace na Sommers: to, co nám sám napíšeš v e-mailu nebo formuláři.",
+        "Web: cookie s tvojí volbou cookies. Statistiky návštěvnosti jen s tvým souhlasem, bez reklamy a bez sledování napříč weby. Podrobnosti na stránce Cookies.",
+      ],
+      en: [
+        "Tickets: name, e-mail, the note on your order and payment details (amount, date, reference). We never see your card number.",
+        "Contact and Sommers registration: whatever you write to us by e-mail or in a form.",
+        "Website: a cookie holding your cookie choice. Traffic statistics only with your consent, no advertising and no cross-site tracking. Details on the Cookies page.",
+      ],
+    },
+  ],
+  [
+    { cs: "Proč to smíme", en: "Why we may" },
+    {
+      cs: [
+        "Údaje z objednávky zpracováváme, protože je potřebujeme k plnění smlouvy o vstupence, a účetní doklady proto, že nám to ukládá zákon.",
+        "Seznam zakázaných vstupů vedeme z oprávněného zájmu na bezpečí hostů. Statistiky návštěvnosti a fotky, na kterých jsi, jen s tvým souhlasem, který můžeš kdykoli odvolat.",
+      ],
+      en: [
+        "We process order details because we need them to fulfil the ticket contract, and accounting records because the law requires it.",
+        "The ban list rests on our legitimate interest in keeping guests safe. Traffic statistics and photos of you only with your consent, which you can withdraw at any time.",
+      ],
+    },
+  ],
+  [
+    { cs: "Kdo k datům má přístup", en: "Who has access" },
+    {
+      cs: [
+        "Jen naše organizační crew a služby, bez kterých to nejde: poskytovatel e-mailu, banka, účetní a případně prodejce vstupenek nebo formulářová služba, přes kterou objednávka přijde. Všichni jsou vázáni smlouvou a zpracovávají data jen pro nás.",
+        "Mapy na webu načítáme z OpenFreeMap. Při tom se k nim dostane tvoje IP adresa, jiné údaje ne.",
+      ],
+      en: [
+        "Only our organising crew and the services we can't run without: our e-mail provider, bank, accountant and, where used, the ticket shop or form service an order comes through. All are bound by contract and process data only on our behalf.",
+        "Maps on the site load from OpenFreeMap. They receive your IP address in the process, nothing else.",
+      ],
+    },
+  ],
+  [
+    { cs: "Kontrola u vstupu", en: "At the door" },
+    {
+      cs: [
+        "U vstupu ověřujeme věk podle dokladu s fotkou. Doklad si jen prohlédneme, nekopírujeme ho ani neukládáme.",
+        "Seznam zakázaných vstupů po porušení pravidel chování vedeme jen v nezbytném rozsahu a maximálně dva roky.",
+      ],
+      en: [
+        "We check your age against a photo ID at the door. We only look at it, we never copy or store it.",
+        "The list of people banned after breaking the code of conduct holds only what is necessary, for two years at most.",
+      ],
+    },
+  ],
+  [
+    { cs: "Fotky z akcí", en: "Event photos" },
+    {
+      cs: [
+        "Na parketu se nefotí. Naši fotografové fotí jen lidi, kteří s tím výslovně souhlasí, a fotky projdou výběrem před zveřejněním.",
+        "Našel ses v galerii a nechceš tam být? Napiš nám a fotku do 48 hodin stáhneme, bez vysvětlování.",
+      ],
+      en: [
+        "No photos on the floor. Our photographers only shoot people who clearly agree to it, and every photo is reviewed before it goes online.",
+        "Found yourself in a gallery and want out? Write to us and we take the photo down within 48 hours, no questions asked.",
+      ],
+    },
+  ],
+  [
+    { cs: "Jak dlouho data držíme", en: "How long we keep it" },
+    {
+      cs: [
+        "Údaje o vstupenkách uchováváme po dobu, kterou vyžaduje účetní a daňová legislativa. E-maily a registrace mažeme do 12 měsíců od poslední akce, které se týkaly.",
+      ],
+      en: [
+        "Ticket records are kept for as long as accounting and tax law requires. E-mails and registrations are deleted within 12 months of the last event they relate to.",
+      ],
+    },
+  ],
+  [
+    { cs: "Tvoje práva", en: "Your rights" },
+    {
+      cs: [
+        "Máš právo na přístup ke svým údajům, jejich opravu, výmaz, omezení zpracování, přenositelnost a právo vznést námitku. Stačí napsat na " + site.email + ", odpovíme do 30 dnů.",
+        "Pokud se ti nelíbí, jak s daty zacházíme, můžeš podat stížnost u Úřadu pro ochranu osobních údajů (uoou.gov.cz).",
+      ],
+      en: [
+        "You have the right to access, correct, erase, restrict and port your data, and to object to its processing. Just write to " + site.email + ", we reply within 30 days.",
+        "If you're unhappy with how we handle your data, you can complain to the Czech Office for Personal Data Protection (uoou.gov.cz).",
+      ],
+    },
+  ],
+];
+---
+
+<Layout lang={lang} title={ui.footer.privacy[lang]}>
+  <PageHero
+    title={ui.footer.privacy[lang]}
+    lead={t({ cs: "Co se děje na parketu, zůstává na parketu. S tvými daty zacházíme stejně.", en: "What happens on the floor stays on the floor. We treat your data the same way." })}
+  />
+  <section class="relative mx-auto max-w-3xl px-4 py-16 sm:px-6 lg:max-w-[54rem] lg:pl-24">
+    <ContentRail label={ui.footer.privacy[lang]} />
+    <LegalList lang={lang} sections={sections} />
+    <p class="mono mt-10 text-xs text-mute">{t({ cs: "Poslední aktualizace: 27.09.2026", en: "Last updated: 27.09.2026" })}</p>
+  </section>
+</Layout>

@@ -1,0 +1,42 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import GalleryCard from "../../../components/GalleryCard.astro";
+import ContactSheet from "../../../components/ContactSheet.astro";
+import ContentRail from "../../../components/ContentRail.astro";
+import { galleries } from "../../../data/galleries";
+import { langPaths, translator, ui, type Lang } from "../../../i18n";
+
+export const getStaticPaths = langPaths;
+const lang = Astro.params.lang as Lang;
+const t = translator(lang);
+
+const byYear = Object.entries(
+  galleries.reduce<Record<string, typeof galleries>>((acc, g) => {
+    (acc[g.date.slice(0, 4)] ??= []).push(g);
+    return acc;
+  }, {}),
+).sort(([a], [b]) => b.localeCompare(a));
+---
+
+<Layout lang={lang} title={ui.nav.galleries[lang]} description={t({ cs: "Fotky, fotostěny a aftermovies z akcí Gearhead Society.", en: "Photos, photo walls and aftermovies from Gearhead Society events." })}>
+  <ContactSheet
+    galleries={galleries}
+    lang={lang}
+    title={ui.nav.galleries[lang]}
+    lead={t({ cs: "Každá fotka vzniká se souhlasem. Chceš nějakou odstranit? Napiš nám a zmizí, bez vyptávání.", en: "Every photo is taken with consent. Want a picture removed? Write to us and it is gone, no questions asked." })}
+  />
+
+  <div class="relative mx-auto max-w-[1400px] space-y-20 px-4 py-16 sm:px-6 lg:pl-24">
+    <ContentRail label={ui.nav.galleries[lang]} />
+    {
+      byYear.map(([year, list]) => (
+        <section>
+          <h2 class="mono mb-8 text-2xl text-mute">{year}</h2>
+          <div class="grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+            {list.map((g, i) => <GalleryCard gallery={g} lang={lang} index={i} />)}
+          </div>
+        </section>
+      ))
+    }
+  </div>
+</Layout>

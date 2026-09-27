@@ -1,0 +1,72 @@
+---
+/**
+ * The site e-mail as a mailto link with a copy button beside it (icon only at `sm`). The button copies the address,
+ * swaps to a check and says "copied" for two seconds (also announced to screen readers).
+ * Without clipboard access it selects the address instead, so it can be copied by hand.
+ */
+import Icon from "./Icon.astro";
+import { site } from "../data/site";
+import { ui, type Lang } from "../i18n";
+
+interface Props {
+  lang: Lang;
+  /** Classes for the link text (size, colour) */
+  class?: string;
+  /** Size of the copy button: "lg" next to a big address, "sm" in running text */
+  size?: "sm" | "lg";
+}
+const { lang, class: cls = "", size = "sm" } = Astro.props;
+---
+
+<span class="copy-email inline-flex max-w-full flex-wrap items-center gap-3" data-copy-email>
+  <a href={`mailto:${site.email}`} class:list={["break-all transition-colors", cls]} data-copy-text>{site.email}</a>
+  <button
+    type="button"
+    class:list={[
+      "mono inline-flex shrink-0 items-center gap-2 border border-line text-bone transition-colors hover:border-acid hover:text-acid",
+      size === "lg" ? "min-h-11 px-3 text-xs" : "size-9 justify-center",
+    ]}
+    aria-label={ui.copy.action[lang]}
+    data-copy-button
+    data-done={ui.copy.done[lang]}
+  >
+    <span class="copy-idle"><Icon name="copy" class={size === "lg" ? "size-4" : "size-3.5"} /></span>
+    <span class="copy-done text-acid"><Icon name="check" class={size === "lg" ? "size-4" : "size-3.5"} /></span>
+    {size === "lg" && <span class="copy-idle">{ui.copy.label[lang]}</span>}
+    {size === "lg" && <span class="copy-done text-acid">{ui.copy.done[lang]}</span>}
+  </button>
+  <span class="sr-only" aria-live="polite" data-copy-status></span>
+</span>
+
+<style>
+  .copy-email .copy-done { display: none; }
+  .copy-email .copy-idle { display: inline-flex; }
+  .copy-email.is-copied .copy-done { display: inline-flex; }
+  .copy-email.is-copied .copy-idle { display: none; }
+</style>
+
+<script>
+  document.querySelectorAll<HTMLElement>("[data-copy-email]").forEach((root) => {
+    const button = root.querySelector<HTMLButtonElement>("[data-copy-button]")!;
+    const text = root.querySelector<HTMLElement>("[data-copy-text]")!;
+    const status = root.querySelector<HTMLElement>("[data-copy-status]")!;
+    const done = button.dataset.done ?? "";
+    let timer = 0;
+    button.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(text.textContent!.trim());
+      } catch {
+        // No clipboard access: select the address so it can be copied by hand
+        getSelection()?.selectAllChildren(text);
+        return;
+      }
+      root.classList.add("is-copied");
+      status.textContent = done;
+      clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        root.classList.remove("is-copied");
+        status.textContent = "";
+      }, 2000);
+    });
+  });
+</script>

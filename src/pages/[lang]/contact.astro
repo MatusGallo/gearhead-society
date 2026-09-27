@@ -1,0 +1,169 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import Icon from "../../components/Icon.astro";
+import ContentRail from "../../components/ContentRail.astro";
+import CopyEmail from "../../components/CopyEmail.astro";
+import { site } from "../../data/site";
+import { langPaths, translator, ui, type Lang } from "../../i18n";
+
+export const getStaticPaths = langPaths;
+const lang = Astro.params.lang as Lang;
+const t = translator(lang);
+const pad = (n: number) => String(n).padStart(2, "0");
+
+const channels = [
+  { title: t({ cs: "Obecné dotazy a vstupenky", en: "General and tickets" }), text: t({ cs: "Dotazy k akci, vstupenkám nebo vrácení peněz.", en: "Questions about an event, tickets or refunds." }), subject: "Question", icon: "ticket" },
+  { title: t({ cs: "DJové a performeři", en: "DJs and performers" }), text: t({ cs: "Pošli nám svůj mix a krátké bio.", en: "Send us your mix and a short bio." }), subject: "Booking", icon: "vinyl-record" },
+  { title: t({ cs: "Partneři a média", en: "Partners and press" }), text: t({ cs: "Značky, obchody, prostory a média.", en: "Brands, shops, venues and media." }), subject: "Partnership", icon: "handshake" },
+  { title: t({ cs: "Odstranění fotky", en: "Photo removal" }), text: t({ cs: "Jakoukoli fotku na požádání stáhneme.", en: "We take down any photo on request." }), subject: "Photo removal", icon: "eye-slash" },
+];
+
+const spec = [
+  [t({ cs: "Odezva", en: "Reply" }), t({ cs: "Do 2 pracovních dnů", en: "Within 2 working days" })],
+  [t({ cs: "Jazyk", en: "Language" }), "CS / EN"],
+  [t({ cs: "Město", en: "City" }), site.city[lang]],
+];
+
+// Signal meter: fixed bar heights and phases, drawn once; only transform animates
+const bars = [...Array(28).keys()].map((i) => ({ h: 30 + ((i * 37) % 70), d: ((i * 53) % 17) / 10 }));
+
+const notes = [
+  { head: t({ cs: "Vstupenky", en: "Tickets" }), text: t({ cs: "Napiš jméno a e-mail, na který ti vstupenka přišla. Najdeme ji rychleji.", en: "Give us your name and the e-mail your ticket went to. We find it faster." }) },
+  { head: t({ cs: "Booking", en: "Booking" }), text: t({ cs: "Stačí odkaz na mix a pár vět o sobě. Soubory do přílohy neposílej.", en: "A link to your mix and a few lines about you is enough. No attachments, please." }) },
+  { head: t({ cs: "Fotky", en: "Photos" }), text: t({ cs: "Pošli odkaz na galerii a číslo fotky. Stáhneme ji bez vyptávání.", en: "Send the gallery link and the photo number. We take it down, no questions asked." }) },
+];
+---
+
+<Layout lang={lang} title={ui.nav.contact[lang]} description={t({ cs: "Napište Gearhead Society.", en: "Get in touch with Gearhead Society." })}>
+  <!-- HERO: a comms console instead of a photo or a board: title and the address on the left,
+       the four topics as transmit channels on the right, each one a mailto with its own subject -->
+  <section class="relative overflow-hidden border-b border-line pt-15">
+    <div class="mx-auto grid max-w-[1400px] gap-12 px-4 pt-16 pb-16 sm:px-6 sm:pt-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,36rem)] lg:gap-16">
+      <div class="flex min-w-0 flex-col">
+        <p class="mono flex items-center gap-2 text-xs text-acid">
+          <span class="tx-live size-1.5 bg-acid" aria-hidden="true"></span>
+          {t({ cs: "Kanál otevřen", en: "Channel open" })}
+        </p>
+        <h1 class="title-in display mt-6 text-[clamp(3rem,9vw,7rem)]" style="--i:1">{t({ cs: "Napiš nám", en: "Talk to us" })}</h1>
+        <p class="title-in mt-7 max-w-[44ch] text-lg leading-relaxed text-bone/75" style="--i:3">
+          {t({ cs: "Čteme všechno. Vyber si kanál, nebo piš rovnou na adresu.", en: "We read everything. Pick a channel, or write straight to the address." })}
+        </p>
+
+        <div class="mt-auto pt-12">
+          <span class="rule-draw block h-px w-full bg-acid" aria-hidden="true"></span>
+          <div class="hero-in mt-6">
+            <CopyEmail lang={lang} size="lg" class="mono text-[1.05rem] text-acid hover:text-bone sm:text-3xl xl:text-4xl" />
+          </div>
+          <dl class="hero-in mono mt-8 grid grid-cols-3 gap-4 text-[0.7rem] leading-tight">
+            {spec.map(([k, v], i) => (
+              <div class="border-l border-line pl-3" style={`--i:${i + 2}`}>
+                <dt class="text-mute">{k}</dt>
+                <dd class="mt-1.5 text-bone">{v}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </div>
+
+      <div class="tx-panel relative flex min-w-0 flex-col border border-line bg-coal">
+        <div class="flex items-center justify-between gap-4 border-b border-line px-5 py-3">
+          <span class="mono text-xs text-mute">TX / {pad(channels.length)} {t({ cs: "kanály", en: "channels" })}</span>
+          <span class="tx-meter flex h-6 items-end gap-[3px]" aria-hidden="true">
+            {bars.map((b) => <span class="w-[3px] bg-acid" style={`height:${b.h}%;--d:${b.d}s`} />)}
+          </span>
+        </div>
+        <ul class="tune-in flex flex-1 flex-col">
+          {channels.map((c, i) => (
+            <li class="flex flex-1 border-b border-line last:border-b-0" style={`--i:${i}`}>
+              <a
+                href={`mailto:${site.email}?subject=${encodeURIComponent(c.subject)}`}
+                class="tx-row group relative grid w-full grid-cols-[2.75rem_minmax(0,1fr)_auto] items-center gap-x-4 px-5 py-6"
+              >
+                <span class="mono relative text-sm text-mute transition-colors group-hover:text-ink">CH{pad(i + 1)}</span>
+                <span class="relative min-w-0">
+                  <span class="display block text-lg leading-tight transition-colors group-hover:text-ink sm:text-xl">{c.title}</span>
+                  <span class="mt-1.5 block text-sm text-mute transition-colors group-hover:text-ink/75">{c.text}</span>
+                </span>
+                <span class="relative flex size-10 items-center justify-center border border-line text-acid transition-colors group-hover:border-ink group-hover:text-ink">
+                  <span class="flex group-hover:hidden"><Icon name={c.icon} class="size-5" /></span>
+                  <span class="hidden group-hover:flex"><Icon name="paper-plane-tilt" class="size-5" /></span>
+                </span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- BEFORE YOU WRITE: what to put in the message, then the socials as open tiles -->
+  <section class="relative mx-auto max-w-[1400px] px-4 py-20 sm:px-6 lg:pl-24">
+    <ContentRail label={ui.nav.contact[lang]} />
+    <h2 class="heading-in display text-[clamp(2rem,5vw,3.75rem)]">{t({ cs: "Než napíšeš", en: "Before you write" })}</h2>
+    <ol class="boot-in mt-10 grid border-t border-line md:grid-cols-3">
+      {notes.map((n, i) => (
+        <li class="border-b border-line py-7 md:border-b-0 md:py-8 md:pr-8 md:[&:not(:first-child)]:border-l md:[&:not(:first-child)]:pl-8" style={`--i:${i}`}>
+          <span class="mono text-xs text-acid">{pad(i + 1)} / {n.head}</span>
+          <p class="mt-4 max-w-[36ch] leading-relaxed text-bone/80">{n.text}</p>
+        </li>
+      ))}
+    </ol>
+
+    <div class="mt-20 grid gap-8 md:grid-cols-[minmax(0,16rem)_minmax(0,1fr)] md:items-end">
+      <p class="display text-2xl sm:text-3xl">{t({ cs: "Nebo nás najdeš na", en: "Or find us on" })}</p>
+      <ul class="grid gap-px border border-line bg-line sm:grid-cols-3">
+        {site.socials.map((s, i) => (
+          <li class="wipe relative" style={`--i:${i}`}>
+            <a href={s.href} target="_blank" rel="noopener" class="group flex h-full items-center justify-between gap-4 bg-ink px-5 py-6 transition-colors hover:bg-acid hover:text-ink">
+              <span class="flex items-center gap-3">
+                <Icon name={s.icon} class="size-6 text-acid transition-colors group-hover:text-ink" />
+                <span class="mono text-sm">{s.label}</span>
+              </span>
+              <Icon name="arrow-up-right" class="size-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+</Layout>
+
+<style>
+  /* Acid fill sweeps in from the channel number on hover, transform only */
+  .tx-row::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--color-acid);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.45s var(--ease-out-expo);
+  }
+  .tx-row:hover::before,
+  .tx-row:focus-visible::before {
+    transform: none;
+  }
+  .tx-panel {
+    background-image: radial-gradient(circle, color-mix(in oklab, var(--color-bone) 7%, transparent) 1px, transparent 1.5px);
+    background-size: 14px 14px;
+  }
+  .tx-meter > span {
+    transform-origin: bottom;
+    opacity: 0.8;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .tx-meter > span {
+      animation: tx-level 1.7s ease-in-out var(--d) infinite alternate;
+    }
+    .tx-live {
+      animation: tx-blink 1.2s steps(1, end) infinite;
+    }
+  }
+  @keyframes tx-level {
+    from { transform: scaleY(0.25); }
+    to { transform: scaleY(1); }
+  }
+  @keyframes tx-blink {
+    50% { opacity: 0.2; }
+  }
+</style>

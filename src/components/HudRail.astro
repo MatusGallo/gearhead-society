@@ -1,0 +1,240 @@
+---
+/**
+ * Vertical HUD strip from the Marathon rails, used on every hero so the glyphs change from page
+ * to page: barcode stacks, an X mark, a target square, triangles, chevrons, a level meter, pixel
+ * grids, rotated numerals and vertical mono lines, with a tick ruler on one edge.
+ * `variant` picks one of the glyph arrangements (and ruler side and tick spacing); pages without
+ * one get it from `seed` (e.g. the page title), so each page keeps its own strip across builds.
+ * The glyphs are plain geometry (CSS/SVG); the numerals and lines must be real data
+ * (e.g. the next event's day and month, the city, the tagline). Boots in glyph by glyph on load.
+ */
+import Icon from "./Icon.astro";
+
+type Glyph = "code" | "x" | "target" | "nums" | "grid" | "lines" | "tri" | "chev" | "meter" | "pixels";
+
+interface Props {
+  /** Two short numerals, read top to bottom */
+  numbers: [string, string];
+  /** Vertical text lines, each becomes one column */
+  lines: string[];
+  /** Glyph arrangement; omitted, it comes from `seed` */
+  variant?: number;
+  /** Any string that should always give the same arrangement, e.g. the page title */
+  seed?: string;
+  /** Skip the boot-in on load and show the strip as is */
+  still?: boolean;
+  class?: string;
+}
+const { numbers, lines, variant, seed = "", still = false, class: cls = "" } = Astro.props;
+
+const presets: { glyphs: Glyph[]; ruler: "right" | "left"; tick: number; code: number[] }[] = [
+  { glyphs: ["code", "x", "target", "nums", "grid", "lines"], ruler: "right", tick: 22, code: [3, 3, 3, 2, 3, 1, 3, 2, 1, 3, 1] },
+  { glyphs: ["target", "nums", "meter", "lines", "code", "tri"], ruler: "left", tick: 14, code: [1, 3, 1, 1, 3, 2, 1] },
+  { glyphs: ["tri", "code", "nums", "x", "lines", "pixels"], ruler: "right", tick: 30, code: [2, 1, 3, 3, 1, 2, 1, 3] },
+  { glyphs: ["pixels", "lines", "chev", "nums", "target", "code"], ruler: "left", tick: 18, code: [3, 1, 2, 1, 3, 1, 1, 2, 3] },
+  { glyphs: ["chev", "x", "nums", "code", "lines", "meter"], ruler: "right", tick: 26, code: [1, 2, 3, 1, 1, 3] },
+];
+const hash = [...seed].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
+const preset = presets[(variant ?? hash) % presets.length];
+// Checker pattern for the pixel glyph, 4 x 4
+const pixels = [1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 0, 0, 0, 1, 1, 0];
+---
+
+<div class:list={["hud-rail", `ruler-${preset.ruler}`, still && "hud-still", cls]} style={`--tick:${preset.tick}px`} aria-hidden="true">
+  {
+    preset.glyphs.map((g, i) => {
+      const style = `--i:${i}`;
+      if (g === "code")
+        return (
+          <div class="hud-code" style={style}>
+            {preset.code.map((h, b) => <span style={`height:${h}px;--b:${b}`} />)}
+          </div>
+        );
+      if (g === "x") return <span class="hud-x" style={style} />;
+      if (g === "target") return <span class="hud-target" style={style} />;
+      if (g === "nums")
+        return (
+          <div class="hud-nums" style={style}>
+            {numbers.map((n) => <span class="hud-num">{n}</span>)}
+          </div>
+        );
+      if (g === "grid") return <span class="hud-glyph" style={style}><Icon name="dots-nine" class="size-4" /></span>;
+      if (g === "lines")
+        return (
+          <div class="hud-lines" style={style}>
+            {lines.map((l) => <span>{l}</span>)}
+          </div>
+        );
+      if (g === "tri")
+        return (
+          <svg class="hud-svg" viewBox="0 0 16 16" style={style}>
+            <path d="M8 2 15 14H1Z" fill="none" stroke="currentColor" stroke-width="2" />
+          </svg>
+        );
+      if (g === "chev")
+        return (
+          <svg class="hud-svg" viewBox="0 0 16 16" style={style}>
+            <path d="M2 3l6 5 6-5M2 9l6 5 6-5" fill="none" stroke="currentColor" stroke-width="2" />
+          </svg>
+        );
+      if (g === "meter")
+        return (
+          <div class="hud-meter" style={style}>
+            {[0.5, 0.8, 1.1, 1.4].map((w) => <span style={`width:${w}rem`} />)}
+          </div>
+        );
+      return (
+        <div class="hud-pixels" style={style}>
+          {pixels.map((on) => <span class:list={[on && "on"]} />)}
+        </div>
+      );
+    })
+  }
+</div>
+<style>
+  .hud-rail {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.4rem;
+    width: 2.75rem;
+    padding-block: 1rem;
+    color: var(--color-acid);
+  }
+  /* Tick ruler down one edge */
+  .hud-rail::after {
+    content: "";
+    position: absolute;
+    inset: 0 0 0 auto;
+    width: 5px;
+    background:
+      linear-gradient(currentColor, currentColor) right / 1px 100% no-repeat,
+      repeating-linear-gradient(to bottom, currentColor 0 1px, transparent 1px var(--tick, 22px)) right / 5px 100% no-repeat;
+    opacity: 0.8;
+  }
+  .ruler-left::after {
+    inset: 0 auto 0 0;
+    background:
+      linear-gradient(currentColor, currentColor) left / 1px 100% no-repeat,
+      repeating-linear-gradient(to bottom, currentColor 0 1px, transparent 1px var(--tick, 22px)) left / 5px 100% no-repeat;
+  }
+  .hud-nums {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.4rem;
+  }
+  .hud-svg {
+    width: 1rem;
+    height: 1rem;
+  }
+  .hud-meter {
+    display: grid;
+    gap: 3px;
+    justify-items: start;
+    width: 1.4rem;
+  }
+  .hud-meter span {
+    height: 3px;
+    background: currentColor;
+  }
+  .hud-pixels {
+    display: grid;
+    grid-template-columns: repeat(4, 4px);
+    gap: 1px;
+  }
+  .hud-pixels span {
+    height: 4px;
+  }
+  .hud-pixels .on {
+    background: currentColor;
+  }
+  .hud-code {
+    display: grid;
+    gap: 2px;
+    width: 1.6rem;
+  }
+  .hud-code span {
+    display: block;
+    background: currentColor;
+  }
+  .hud-x {
+    position: relative;
+    width: 1rem;
+    height: 1rem;
+  }
+  .hud-x::before,
+  .hud-x::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: -15%;
+    width: 130%;
+    height: 2px;
+    background: currentColor;
+    rotate: 45deg;
+  }
+  .hud-x::after {
+    rotate: -45deg;
+  }
+  .hud-target {
+    display: grid;
+    place-items: center;
+    width: 1.1rem;
+    height: 1.1rem;
+    border: 2px solid currentColor;
+  }
+  .hud-target::after {
+    content: "";
+    width: 5px;
+    height: 5px;
+    background: currentColor;
+  }
+  .hud-num {
+    writing-mode: vertical-rl;
+    font: 700 1.05rem/1 var(--font-mono);
+    letter-spacing: 0.02em;
+  }
+  /* One column per line, first line on the left like the reference */
+  .hud-lines {
+    display: flex;
+    gap: 0.1rem;
+    font: 500 9.5px/1.25 var(--font-mono);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .hud-lines span {
+    writing-mode: vertical-rl;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .hud-rail:not(.hud-still) > * {
+      animation: hud-blink 0.7s steps(1, end) both;
+      animation-delay: calc(var(--i, 0) * 110ms + 700ms);
+    }
+    .hud-rail:not(.hud-still) .hud-code span {
+      transform-origin: left;
+      animation: hud-bar 0.5s var(--ease-out-expo) both;
+      animation-delay: calc(var(--b) * 45ms + 700ms);
+    }
+    .hud-rail:not(.hud-still)::after {
+      transform-origin: top;
+      animation: hud-rule 1.2s var(--ease-out-expo) 0.5s both;
+    }
+  }
+  @keyframes hud-blink {
+    0% { opacity: 0; }
+    30% { opacity: 1; }
+    45% { opacity: 0.15; }
+    60%, 100% { opacity: 1; }
+  }
+  @keyframes hud-bar {
+    from { transform: scaleX(0); }
+    to { transform: none; }
+  }
+  @keyframes hud-rule {
+    from { transform: scaleY(0); }
+    to { transform: none; }
+  }
+</style>

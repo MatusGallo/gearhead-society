@@ -1,0 +1,239 @@
+---
+/**
+ * Full-screen photo viewer for a gallery grid. Opens from any `[data-lb-open="<index>"]`
+ * button on the page. Arrow keys, on-screen buttons and swipe move between photos, Esc
+ * closes (native <dialog>), and `#foto-3` in the URL opens photo 3 directly so a single
+ * photo can be shared. The download button serves the original file.
+ */
+import Icon from "./Icon.astro";
+import { translator, type Lang } from "../i18n";
+
+export type LightboxItem = {
+  /** Large view (optimized) */
+  full: string;
+  /** Original file for the download */
+  download: string;
+  /** Download file name */
+  name: string;
+  /** Original pixel size, shown on the download button */
+  w: number;
+  h: number;
+  alt: string;
+};
+
+interface Props {
+  items: LightboxItem[];
+  title: string;
+  lang: Lang;
+  /** Where removal requests go */
+  email: string;
+}
+const { items, title, lang, email } = Astro.props;
+const t = translator(lang);
+---
+
+<dialog class="lightbox" data-lightbox aria-label={title}>
+  <div class="lb-bar">
+    <p class="mono text-sm tabular-nums" aria-live="polite"><span data-lb-index>1</span> / {items.length}</p>
+    <p class="mono hidden truncate text-sm text-bone/70 sm:block">{title}</p>
+    <div class="ml-auto flex items-center gap-2">
+      <a class="btn btn-acid min-h-11 px-4 text-xs sm:px-5" data-lb-download href={items[0]?.download} download={items[0]?.name}>
+        <Icon name="download-simple" class="size-4" />
+        <span>{t({ cs: "Stáhnout", en: "Download" })}</span>
+        <span class="hidden opacity-70 sm:inline" data-lb-size></span>
+      </a>
+      <button type="button" class="lb-icon" data-lb-close aria-label={t({ cs: "Zavřít", en: "Close" })}>
+        <Icon name="x" class="size-5" />
+      </button>
+    </div>
+  </div>
+
+  <figure class="lb-stage" data-lb-stage>
+    <span class="lb-frame frame frame-on">
+      <img data-lb-img src={items[0]?.full} alt={items[0]?.alt} decoding="async" />
+    </span>
+  </figure>
+
+  <button type="button" class="lb-icon lb-nav lb-prev" data-lb-prev aria-label={t({ cs: "Předchozí fotka", en: "Previous photo" })}>
+    <Icon name="caret-left" class="size-6" />
+  </button>
+  <button type="button" class="lb-icon lb-nav lb-next" data-lb-next aria-label={t({ cs: "Další fotka", en: "Next photo" })}>
+    <Icon name="caret-right" class="size-6" />
+  </button>
+
+  <p class="lb-note">
+    {t({ cs: "Fotky jsou k osobnímu použití. Chceš nějakou odstranit? Napiš na", en: "Photos are for personal use. Want one removed? Email" })}{" "}
+    <a href={`mailto:${email}`} class="text-bone underline underline-offset-4 hover:text-acid">{email}</a>.
+  </p>
+  <script type="application/json" data-lb-items set:html={JSON.stringify(items)} />
+</dialog>
+
+<style>
+  .lightbox {
+    width: 100vw;
+    height: 100dvh;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: rgb(5 5 5 / 0.97);
+    color: var(--color-bone);
+    overflow: hidden;
+  }
+  .lightbox[open] {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+  }
+  .lightbox::backdrop {
+    background: rgb(0 0 0 / 0.7);
+  }
+  .lb-bar {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    min-height: 3.75rem;
+    padding: 0.5rem 0.75rem 0.5rem 1rem;
+    border-bottom: 1px solid var(--color-line);
+  }
+  .lb-icon {
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border: 1px solid var(--color-line);
+    background: var(--color-ink);
+    transition: border-color 0.3s var(--ease-out-expo), color 0.3s var(--ease-out-expo);
+  }
+  .lb-icon:hover {
+    border-color: var(--color-acid);
+    color: var(--color-acid);
+  }
+  .lb-stage {
+    display: grid;
+    place-items: center;
+    min-height: 0;
+    padding: 1.25rem 1rem;
+    touch-action: pan-y;
+  }
+  .lb-frame {
+    display: inline-block;
+    line-height: 0;
+  }
+  .lb-frame img {
+    width: auto;
+    height: auto;
+    max-width: calc(100vw - 2rem);
+    max-height: calc(100dvh - 10rem);
+    background: var(--color-steel);
+  }
+  .lb-nav {
+    position: absolute;
+    top: 50%;
+    translate: 0 -50%;
+  }
+  .lb-prev { left: 1rem; }
+  .lb-next { right: 1rem; }
+  .lb-note {
+    padding: 0.75rem 1rem 1rem;
+    font-size: 0.8rem;
+    color: var(--color-mute);
+    text-align: center;
+  }
+  @media (max-width: 767px) {
+    /* Thumbs reach the bottom corners; the photo keeps the full width */
+    .lb-nav { top: auto; bottom: 5rem; translate: none; }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    /* Opens like a scanner: a horizontal slit widens to the full frame */
+    .lightbox[open] {
+      animation: lb-open 0.45s var(--ease-out-expo);
+    }
+    .lb-frame[data-dir] img {
+      animation: lb-swap 0.4s var(--ease-out-expo);
+    }
+    .lb-frame[data-dir="prev"] img {
+      --from: -28px;
+    }
+  }
+  @keyframes lb-open {
+    from { clip-path: inset(49% 0); }
+    to { clip-path: inset(0); }
+  }
+  @keyframes lb-swap {
+    from { opacity: 0; transform: translateX(var(--from, 28px)); }
+    to { opacity: 1; transform: none; }
+  }
+</style>
+
+<script>
+  type Item = { full: string; download: string; name: string; w: number; h: number; alt: string };
+
+  document.querySelectorAll<HTMLDialogElement>("[data-lightbox]").forEach((dialog) => {
+    const items: Item[] = JSON.parse(dialog.querySelector("[data-lb-items]")!.textContent || "[]");
+    const img = dialog.querySelector<HTMLImageElement>("[data-lb-img]")!;
+    const frame = img.parentElement!;
+    const counter = dialog.querySelector<HTMLElement>("[data-lb-index]")!;
+    const download = dialog.querySelector<HTMLAnchorElement>("[data-lb-download]")!;
+    const size = dialog.querySelector<HTMLElement>("[data-lb-size]")!;
+    let index = 0;
+
+    const show = (i: number, dir?: "next" | "prev") => {
+      index = (i + items.length) % items.length;
+      const it = items[index];
+      img.src = it.full;
+      img.alt = it.alt;
+      img.width = it.w;
+      img.height = it.h;
+      counter.textContent = String(index + 1);
+      download.href = it.download;
+      download.download = it.name;
+      size.textContent = `${it.w} × ${it.h}`;
+      if (dir) {
+        frame.removeAttribute("data-dir");
+        void frame.offsetWidth; // restart the swap animation
+        frame.setAttribute("data-dir", dir);
+      }
+      history.replaceState(null, "", `#foto-${index + 1}`);
+      // Warm up the neighbours so paging feels instant
+      for (const n of [index + 1, index - 1]) new Image().src = items[(n + items.length) % items.length].full;
+    };
+
+    const open = (i: number) => {
+      show(i);
+      if (!dialog.open) dialog.showModal();
+    };
+
+    document.querySelectorAll<HTMLElement>("[data-lb-open]").forEach((btn) =>
+      btn.addEventListener("click", () => open(Number(btn.dataset.lbOpen))),
+    );
+    dialog.querySelector("[data-lb-next]")!.addEventListener("click", () => show(index + 1, "next"));
+    dialog.querySelector("[data-lb-prev]")!.addEventListener("click", () => show(index - 1, "prev"));
+    dialog.querySelector("[data-lb-close]")!.addEventListener("click", () => dialog.close());
+    dialog.addEventListener("close", () => history.replaceState(null, "", location.pathname + location.search));
+    dialog.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight") show(index + 1, "next");
+      if (e.key === "ArrowLeft") show(index - 1, "prev");
+    });
+    // Click on the dark area around the photo closes (not the click that ends a swipe)
+    let swiped = false;
+    dialog.addEventListener("click", (e) => {
+      if (swiped) return void (swiped = false);
+      if (e.target === dialog || e.target === dialog.querySelector("[data-lb-stage]")) dialog.close();
+    });
+
+    // Swipe
+    let startX = 0;
+    const stage = dialog.querySelector<HTMLElement>("[data-lb-stage]")!;
+    stage.addEventListener("pointerdown", (e) => (startX = e.clientX));
+    stage.addEventListener("pointerup", (e) => {
+      const dx = e.clientX - startX;
+      swiped = Math.abs(dx) > 50;
+      if (swiped) show(index + (dx < 0 ? 1 : -1), dx < 0 ? "next" : "prev");
+    });
+
+    const fromHash = location.hash.match(/^#foto-(\d+)$/);
+    if (fromHash) open(Number(fromHash[1]) - 1);
+  });
+</script>

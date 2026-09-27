@@ -1,0 +1,257 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import Countdown from "../../../components/Countdown.astro";
+import Icon from "../../../components/Icon.astro";
+import HudRail from "../../../components/HudRail.astro";
+import ContentRail from "../../../components/ContentRail.astro";
+import OpsLayer from "../../../components/OpsLayer.astro";
+import Pointer from "../../../components/Pointer.astro";
+import ScanField from "../../../components/ScanField.astro";
+import SectionHeading from "../../../components/SectionHeading.astro";
+import SommersCard from "../../../components/SommersCard.astro";
+import EditionMark from "../../../components/EditionMark.astro";
+import { editionLabel, formatRange, pastEditions, sommers, upcomingEditions } from "../../../data/sommers";
+import { dissolve } from "../../../data/dissolve";
+import { href, langPaths, translator, ui, type Lang } from "../../../i18n";
+
+export const getStaticPaths = langPaths;
+const lang = Astro.params.lang as Lang;
+const t = translator(lang);
+
+const upcoming = upcomingEditions();
+const past = pastEditions();
+// Past editions come in pages of one desktop row; the rest load on request
+const pageSize = 3;
+const next = upcoming[0];
+const mailto = (subject: string) => `mailto:${sommers.email}?subject=${encodeURIComponent(subject)}`;
+const register = t({ cs: "Registrace", en: "Register" });
+// Meetups start on Friday afternoon; setkání without a number show their date instead
+const startsAt = next ? `${next.start}T15:00:00+02:00` : "";
+const big = next ? (next.number ? String(next.number) : `${Number(next.start.slice(8, 10))}.${Number(next.start.slice(5, 7))}.`) : "";
+const zones = t({ cs: ["Chata", "Herna", "Jídelna", "Bar", "Příjezd"], en: ["Lodge", "Playroom", "Dining", "Bar", "Arrival"] });
+
+const pillars = [
+  { title: t({ cs: "Od 18 let", en: "18+" }), text: t({ cs: "Vstup od 18 let, není třeba ručitel.", en: "Entry from 18, no guarantor needed." }) },
+  { title: t({ cs: "Jen se souhlasem", en: "Consent only" }), text: t({ cs: "Jakékoliv aktivity jen k těm, kdo k nim dali zřejmý souhlas.", en: "Any activity only with people who have clearly agreed to it." }) },
+  { title: t({ cs: "Bez personálu", en: "No staff" }), text: t({ cs: "Obsluhujeme se sami a sami po sobě i uklízíme.", en: "We serve ourselves and clean up after ourselves." }) },
+  { title: t({ cs: "Nekomerční", en: "Non-commercial" }), text: t({ cs: "Platíš jen náklady na ubytování a jídlo, nic navíc.", en: "You only pay for accommodation and food, nothing more." }) },
+];
+
+const readout = next
+  ? ([
+      [t({ cs: "Termín", en: "Dates" }), formatRange(next.start, next.end, lang)],
+      [t({ cs: "Místo", en: "Place" }), next.place[lang]],
+      [t({ cs: "Cena", en: "Price" }), next.price?.[lang]],
+      [t({ cs: "Kapacita", en: "Capacity" }), next.capacity?.[lang]],
+      ...(next.deadlines ?? []).slice(0, 2).map((d) => [d.label[lang], d.value[lang]]),
+    ].filter(([, v]) => v) as [string, string][])
+  : [];
+---
+
+<Layout lang={lang} theme="sommers" title="Sommers" description={t({ cs: "Sommers: srazy fetišistů a BDSM pozitivních lidí bez rozdílu fetiše a zaměření.", en: "Sommers: meetups for fetishists and BDSM-positive people of every fetish and orientation." })}>
+  <!-- HERO: steerable scan map with a target on the venue, giant outlined edition number,
+       HUD strip with the next meetup, letter-by-letter wordmark rail -->
+  <section class="grid pt-15 lg:h-[100dvh] lg:min-h-[40rem] lg:grid-cols-[1fr_20rem]">
+    <div class="relative order-2 flex min-h-[80dvh] flex-col justify-end overflow-hidden lg:order-1 lg:min-h-0" data-pointer>
+      <ScanField seed={next?.seed ?? 49} labels={zones} steer pauseLabel={ui.pause[lang]} playLabel={ui.play[lang]} label={t({ cs: "Animovaná mapa: tým se přesouvá k místu srazu", en: "Animated map: the team closes in on the meetup venue" })} class="!absolute inset-0">
+        {next && (
+          <OpsLayer
+            slot="world"
+            target={startsAt}
+            countdownLabels={ui.countdown[lang]}
+            lock={[`${lang === "cs" ? "Sraz" : "Meetup"}:${next.number ?? big}`, next.place[lang], ...(next.capacity ? [next.capacity[lang]] : [])]}
+            squad={[`${t({ cs: "Tým", en: "Team" })}:${sommers.hosts.split(",").length}`, sommers.hosts]}
+          />
+        )}
+      </ScanField>
+      <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink via-ink/25 to-transparent"></div>
+
+      {
+        next && (
+          <>
+            <span class="display outline-num pointer-events-none absolute -top-[0.08em] right-[-0.04em] text-[clamp(12rem,38vw,34rem)] !leading-[0.8] select-none" aria-hidden="true">
+              <span class="title-in block" style="--i:2">{big}</span>
+            </span>
+          </>
+        )
+      }
+
+      <div class="relative px-4 pb-10 sm:px-8">
+        {next && <p class="title-in display max-w-[14ch] text-[clamp(2.25rem,5.5vw,4.5rem)] !leading-[0.95] text-balance" style="--i:1">{next.title[lang]}</p>}
+        <div class="hero-in">
+          <p class="mt-6 max-w-[44ch] text-lg leading-relaxed text-bone/90" style="--i:3">
+            {t({ cs: "Víkendové srazy a menší setkání fetišistů a BDSM pozitivních lidí. Společenská akce, fetiš oblečky velmi vítány.", en: "Weekend meetups and smaller get-togethers for fetishists and BDSM-positive people. A social event, fetish outfits very welcome." })}
+          </p>
+          <div class="mt-7 flex flex-wrap gap-3" style="--i:4">
+            {next && <a href={mailto(`${register}: ${editionLabel(next, lang)}`)} class="btn btn-acid">{register} <Icon name="envelope-simple" /></a>}
+            <a href="#edice" class="btn btn-ghost bg-ink/75">{t({ cs: "Všechny edice", en: "All editions" })}</a>
+          </div>
+        </div>
+      </div>
+      {
+        next && (
+          <div class="hero-in relative grid items-center gap-x-8 gap-y-1 bg-acid px-4 py-3 text-ink sm:px-8 xl:grid-cols-[auto_1fr_auto]">
+            <p class="display text-xl sm:text-2xl" style="--i:5">{t({ cs: "Příště", en: "Next up" })}: {editionLabel(next, lang)}</p>
+            <p class="mono flex flex-wrap gap-x-4 text-xs sm:text-sm" style="--i:6">
+              <span>{formatRange(next.start, next.end, lang)}</span>
+              {next.capacity && <span>{next.capacity[lang]}</span>}
+            </p>
+            <p class="text-sm sm:text-base" style="--i:7"><Countdown target={startsAt} labels={ui.countdown[lang]} compact /></p>
+          </div>
+        )
+      }
+    </div>
+
+    <aside class="relative order-1 flex items-center justify-center overflow-hidden border-line bg-ink px-4 py-10 lg:order-2 lg:border-l lg:py-14">
+      {next && (
+        <div class="absolute inset-y-0 left-0 hidden lg:block">
+        <HudRail
+          class="h-full !py-14"
+          variant={3}
+          numbers={[big, next.start.slice(2, 4)]}
+          lines={[`Sommers / ${next.place[lang]}`, lang === "cs" ? `„${next.title[lang]}“` : `“${next.title[lang]}”`]}
+        />
+        </div>
+      )}
+      <div class="hidden text-acid lg:block" aria-hidden="true">
+        <Icon name="plus" class="absolute top-4 left-1/2 size-5 -translate-x-1/2" />
+        <Icon name="plus" class="absolute bottom-4 left-1/2 size-5 -translate-x-1/2" />
+      </div>
+      <h1 class="display char-in w-full whitespace-nowrap text-[13vw] !leading-[0.9] text-acid lg:w-auto lg:rail lg:text-[min(9rem,12dvh)] lg:!leading-[0.84]" aria-label="Sommers">
+        {[..."Sommers"].map((c, i) => <span style={`--i:${i}`} aria-hidden="true">{c}</span>)}
+      </h1>
+    </aside>
+  </section>
+
+  <Pointer />
+
+  <!-- NEXT MEETUP READOUT -->
+  {
+    next && (
+      <section>
+        <div class="mx-auto grid max-w-[1400px] gap-12 px-4 py-16 sm:px-6 lg:grid-cols-[1fr_1.3fr]">
+          <div>
+            <h2 class="display text-3xl sm:text-4xl">{t({ cs: "Nejbližší sraz", en: "Next meetup" })}</h2>
+            <EditionMark edition={next} lang={lang} class="mt-5 text-4xl" />
+            <p class="mt-5 max-w-[46ch] leading-relaxed text-bone/80">{next.summary[lang]}</p>
+            <div class="mt-8">
+              <Countdown target={startsAt} labels={ui.countdown[lang]} />
+            </div>
+            <a href={href(lang, `/sommers/${next.slug}`)} class="tix relative mt-8 inline-flex items-center gap-6 bg-violet px-5 py-3" style={`--dr:${dissolve(23, false)}`}>
+              <span class="grid gap-1.5">
+                <span class="display text-xs text-acid">{formatRange(next.start, next.end, lang)}</span>
+                <span class="tix-box display bg-acid px-2 pt-1 pb-0.5 text-2xl leading-none text-violet sm:text-3xl">{t({ cs: "Detail srazu", en: "Meetup details" })}</span>
+              </span>
+              <Icon name="arrow-right" class="tix-arrow-r tix-arrow size-6 text-acid" />
+            </a>
+          </div>
+          <dl class="mono grid grid-cols-2 content-start gap-x-6 gap-y-6 text-xs sm:grid-cols-3">
+            {readout.map(([k, v]) => (
+              <div>
+                <dt class="text-mute">{k}</dt>
+                <dd class="mt-1 text-bone">{v}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </section>
+    )
+  }
+
+  <!-- HOW IT WORKS -->
+  <section class="relative mx-auto max-w-[1400px] px-4 py-24 sm:px-6 lg:pl-24">
+    <ContentRail label="Sommers" numbers={next ? [big, next.start.slice(2, 4)] : undefined} lines={next ? [`Sommers / ${next.place[lang]}`, formatRange(next.start, next.end, lang)] : undefined} />
+    <h2 class="reveal display text-[clamp(2.5rem,7vw,5.5rem)]">{t({ cs: "Jak to u nás chodí", en: "How it works" })}</h2>
+    <div class="mt-14 grid gap-12 lg:grid-cols-2">
+      <div class="max-w-[60ch] space-y-4 leading-relaxed text-bone/80">
+        {sommers.intro[lang].map((p) => <p>{p}</p>)}
+        <p>
+          {t({ cs: "Veškerou srazovou komunikaci zajišťuje Sommers pouze na e-mailu", en: "All communication goes through Sommers by e-mail only:" })}{" "}
+          <a href={`mailto:${sommers.email}`} class="text-acid underline underline-offset-4 hover:text-bone">{sommers.email}</a>.
+        </p>
+      </div>
+      <dl class="grid content-start gap-px self-start overflow-hidden border border-line bg-line sm:grid-cols-2">
+        {pillars.map((p) => (
+          <div class="bg-ink p-6">
+            <dt class="mono text-sm text-acid">{p.title}</dt>
+            <dd class="mt-2 text-sm text-mute">{p.text}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  </section>
+
+  <!-- EDITIONS -->
+  <section id="edice" class="mx-auto max-w-[1400px] scroll-mt-24 px-4 pb-24 sm:px-6">
+    {
+      upcoming.length > 0 && (
+        <>
+          <SectionHeading title={t({ cs: "Nadcházející", en: "Upcoming" })} />
+          <div class="mb-24 grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+            {upcoming.map((e) => <SommersCard edition={e} lang={lang} />)}
+          </div>
+        </>
+      )
+    }
+    <SectionHeading title={t({ cs: "Proběhlé edice", en: "Past editions" })} />
+    <div data-more={pageSize}>
+      <div class="grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+        {past.map((e, i) => (
+          <div data-more-item hidden={i >= pageSize}>
+            <SommersCard edition={e} lang={lang} past />
+          </div>
+        ))}
+      </div>
+      {
+        past.length > pageSize && (
+          <div class="mt-12 flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <p class="mono text-xs text-bone/60" aria-live="polite">
+              {t({ cs: "Zobrazeno", en: "Showing" })} <span data-more-count>{pageSize}</span> / {past.length}
+            </p>
+            <button type="button" data-more-button class="more-btn mono group relative inline-flex items-center gap-3 overflow-hidden border border-acid px-6 py-4 text-sm text-acid transition-colors hover:bg-acid hover:text-ink">
+              <Icon name="plus" class="size-4 transition-transform duration-300 group-hover:rotate-90" />
+              <span class="more-idle">{t({ cs: "Načíst starší edice", en: "Load older editions" })}</span>
+              <span class="more-busy">{t({ cs: "Načítám", en: "Loading" })}</span>
+              <span class="more-bar" aria-hidden="true"></span>
+            </button>
+          </div>
+        )
+      }
+    </div>
+  </section>
+
+  <!-- CONTACT -->
+  <section class="bg-coal">
+    <div class="mx-auto max-w-[1400px] px-4 py-20 sm:px-6">
+      <h2 class="display max-w-3xl text-3xl sm:text-5xl">{t({ cs: "Máš dotaz? Napiš Sommers.", en: "Questions? Write to Sommers." })}</h2>
+      <a href={`mailto:${sommers.email}`} class="mono mt-8 inline-block text-xl break-all text-acid hover:text-bone sm:text-3xl">{sommers.email}</a>
+      <p class="mt-6 text-bone/70">{t({ cs: "Na srazy srdečně zvou a těší se na viděnou:", en: "Warmly inviting you and looking forward to seeing you:" })} {sommers.hosts}.</p>
+    </div>
+  </section>
+</Layout>
+
+<script>
+  // Reveals the next page of past editions after a short loading beat (skipped under reduced motion)
+  for (const root of document.querySelectorAll<HTMLElement>("[data-more]")) {
+    const step = Number(root.dataset.more) || 3;
+    const button = root.querySelector<HTMLButtonElement>("[data-more-button]");
+    const count = root.querySelector("[data-more-count]");
+    const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    button?.addEventListener("click", () => {
+      if (button.dataset.state === "busy") return;
+      button.dataset.state = "busy";
+      setTimeout(() => {
+        const hidden = [...root.querySelectorAll<HTMLElement>("[data-more-item][hidden]")];
+        hidden.slice(0, step).forEach((el, i) => {
+          el.style.setProperty("--i", String(i));
+          el.classList.add("load-in");
+          el.hidden = false;
+        });
+        const shown = root.querySelectorAll("[data-more-item]:not([hidden])").length;
+        if (count) count.textContent = String(shown);
+        delete button.dataset.state;
+        if (hidden.length <= step) button.remove();
+      }, still ? 0 : 750);
+    });
+  }
+</script>

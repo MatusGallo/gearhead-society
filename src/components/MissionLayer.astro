@@ -1,0 +1,280 @@
+---
+/**
+ * Mission-report overlay for a ScanField (`slot="world"`): the night as a route through the venue
+ * zones, from the door to the chill zone. Squads move leg by leg along the route with a light beam
+ * over the leader and a fading trail, hold at each waypoint and respawn at the door; waypoints ping.
+ * Timing is shared with MissionLog (src/data/mission.ts), so its status lines switch with the legs.
+ *
+ * Everything lives on the tilted map plane (CSS 3D, transform and opacity only); beams stand up
+ * from the plane. Opacity sits on the leaves, never on a preserve-3d parent (it would flatten the
+ * beams). The ScanField pause button stops everything; reduced motion parks the squads on the route.
+ */
+import { MISSION, legRange, squadDelay } from "../data/mission";
+
+interface Props {
+  /** Zone names in route order: entry, cloakroom, floor, bar, chill */
+  route: string[];
+  /** Real times per waypoint, e.g. doors at the first and closing at the last; empty for none */
+  times?: string[];
+}
+const { route, times = [] } = Astro.props;
+
+// Waypoints on the map plane (percent), inside the part of the plane the tilted camera shows
+const spots = [
+  { x: 29, y: 66 },
+  { x: 40, y: 46 },
+  { x: 53, y: 30 },
+  { x: 65, y: 52 },
+  { x: 74, y: 28 },
+];
+const points = route.slice(0, spots.length).map((name, i) => ({ name, time: times[i], ...spots[i] }));
+const start = points[0];
+const rel = (p: { x: number; y: number }) => `translate(${p.x - start.x}%,${p.y - start.y}%)`;
+
+// Route: transform only. Fade: opacity for the leaves, in step with the route
+const route_ = [`0%,${MISSION.intro}%{transform:${rel(start)}}`];
+const fade = [`0%{opacity:0}`, `${MISSION.intro}%{opacity:1}`];
+points.slice(1).forEach((p, i) => {
+  const [a, b] = legRange(i);
+  route_.push(`${a + MISSION.move}%,${b}%{transform:${rel(p)}}`);
+});
+const [, end] = legRange(points.length - 2);
+const last = rel(points[points.length - 1]);
+route_.push(`100%{transform:${last}}`);
+fade.push(`${end}%{opacity:1}`, `${Math.min(end + 5, 96)}%,100%{opacity:0}`);
+const keyframes = `@keyframes mission-route{${route_.join("")}}@keyframes mission-fade{${fade.join("")}}`;
+
+// Formation around the leader, in rem; trail ghosts follow the leader a beat behind
+const formation = [
+  [-0.95, 0.55],
+  [0.95, 0.65],
+  [0, 1.2],
+];
+const trail = [0.35, 0.7, 1.05];
+const line = points.map((p) => `${p.x},${p.y}`).join(" ");
+// Direction marks halfway along each leg, pointing to the next waypoint
+const arrows = points.slice(1).map((p, i) => {
+  const a = points[i];
+  return { x: (a.x + p.x) / 2, y: (a.y + p.y) / 2, deg: (Math.atan2(p.y - a.y, p.x - a.x) * 180) / Math.PI };
+});
+---
+
+<div class="mission" aria-hidden="true">
+  <Fragment set:html={`<style>${keyframes}</style>`} />
+
+  <svg class="mission-route" viewBox="0 0 100 100" preserveAspectRatio="none">
+    <polyline points={line} />
+  </svg>
+  {arrows.map((a) => <span class="mission-arrow" style={`left:${a.x}%;top:${a.y}%;rotate:${a.deg}deg`} />)}
+
+  {
+    points.map((p, i) => (
+      <div class="mission-wp" style={`left:${p.x}%;top:${p.y}%;--i:${i}`}>
+        <span class="mission-ping" />
+        <span class="mission-mark" />
+        <p class="mission-label">
+          <span class="mission-idx">
+            WP{String(i + 1).padStart(2, "0")}
+            {p.time && <span class="mission-time">{p.time}</span>}
+          </span>
+          {p.name}
+        </p>
+      </div>
+    ))
+  }
+
+  {
+    MISSION.squads.map((s, i) => (
+      <>
+        {trail.map((lag, k) => (
+          <div class="mission-squad" style={`--delay:${squadDelay(i) + lag}s;--park:${rel(points[s.park])}`}>
+            <span class="mission-ghost" style={`left:${start.x}%;top:${start.y}%;--o:${0.55 - k * 0.15}`} />
+          </div>
+        ))}
+        <div class="mission-squad" style={`--delay:${squadDelay(i)}s;--park:${rel(points[s.park])}`}>
+          <div class="mission-leader" style={`left:${start.x}%;top:${start.y}%`}>
+            <span class="mission-beam" />
+            <span class="mission-unit mission-unit-lead" />
+            {formation.map(([x, y]) => (
+              <span class="mission-unit" style={`translate:${x}rem ${y}rem`} />
+            ))}
+            <span class="mission-tag">[SQ-{s.tag}]</span>
+          </div>
+        </div>
+      </>
+    ))
+  }
+</div>
+
+<style>
+  .mission,
+  .mission-squad {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    transform-style: preserve-3d;
+  }
+  .mission {
+    --mission-mark: #c0fe04;
+    --mission-unit: #ff6a2d;
+  }
+
+  .mission-route {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+  .mission-route polyline {
+    fill: none;
+    stroke: var(--mission-mark);
+    stroke-opacity: 0.55;
+    stroke-width: 1.5;
+    stroke-dasharray: 6 5;
+    vector-effect: non-scaling-stroke;
+  }
+  .mission-arrow {
+    position: absolute;
+    width: 9px;
+    height: 9px;
+    margin: -4.5px 0 0 -4.5px;
+    border-top: 2px solid var(--mission-mark);
+    border-right: 2px solid var(--mission-mark);
+    transform: rotate(45deg);
+    opacity: 0.8;
+  }
+
+  .mission-wp {
+    position: absolute;
+    width: 0;
+    height: 0;
+  }
+  .mission-mark,
+  .mission-ping {
+    position: absolute;
+    left: -0.5rem;
+    top: -0.5rem;
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid var(--mission-mark);
+  }
+  .mission-mark::after {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    background: var(--mission-mark);
+  }
+  .mission-ping {
+    opacity: 0;
+  }
+  .mission-label {
+    position: absolute;
+    left: 0.9rem;
+    top: -0.55rem;
+    display: grid;
+    font: 600 12px/1.2 var(--font-mono);
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: rgb(242 242 242 / 0.9);
+  }
+  .mission-idx {
+    display: flex;
+    gap: 0.4rem;
+    font-size: 10px;
+    color: var(--mission-mark);
+  }
+  .mission-time {
+    padding: 0 0.25rem;
+    color: var(--color-ink);
+    background: var(--mission-mark);
+  }
+
+  .mission-squad {
+    transform: var(--park);
+  }
+  .mission-leader {
+    position: absolute;
+    width: 0;
+    height: 0;
+    transform-style: preserve-3d;
+  }
+  .mission-unit {
+    position: absolute;
+    left: -4px;
+    top: -4px;
+    width: 8px;
+    height: 8px;
+    border: 2px solid var(--mission-unit);
+  }
+  /* Trail dot, placed by inline left/top like the leader */
+  .mission-ghost {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    margin: -3px 0 0 -3px;
+    background: var(--mission-unit);
+    opacity: 0;
+  }
+  .mission-unit-lead {
+    background: var(--mission-unit);
+    rotate: 45deg;
+  }
+  /* Light beam standing up from the leader, perpendicular to the map */
+  .mission-beam {
+    position: absolute;
+    left: -1px;
+    bottom: 0;
+    width: 2px;
+    height: 6.5rem;
+    transform-origin: 50% 100%;
+    transform: rotateX(-90deg);
+    background: linear-gradient(to top, var(--mission-unit), rgb(255 106 45 / 0));
+  }
+  /* Tag hangs left of the leader so it never covers a waypoint label */
+  .mission-tag {
+    position: absolute;
+    right: 1.3rem;
+    top: -1.2rem;
+    padding: 0.1rem 0.3rem;
+    font: 600 10px/1.2 var(--font-mono);
+    white-space: nowrap;
+    color: var(--color-ink);
+    background: var(--mission-unit);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .mission-squad {
+      animation: mission-route 26s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+      animation-delay: var(--delay);
+    }
+    .mission-leader > * {
+      animation: mission-fade 26s linear infinite;
+      animation-delay: var(--delay);
+    }
+    /* Trail dots fade with the squad, each dimmer than the one before */
+    .mission-ghost {
+      animation: mission-ghost 26s linear infinite;
+      animation-delay: var(--delay);
+    }
+    .mission-ping {
+      animation: mission-ping 2.8s ease-out infinite;
+      animation-delay: calc(var(--i) * 0.55s);
+    }
+    :global(.scan[data-paused]) .mission-squad,
+    :global(.scan[data-paused]) .mission-leader > *,
+    :global(.scan[data-paused]) .mission-ghost,
+    :global(.scan[data-paused]) .mission-ping {
+      animation-play-state: paused;
+    }
+  }
+  @keyframes mission-ghost {
+    0%, 3% { opacity: 0; }
+    6%, 86% { opacity: var(--o); }
+    92%, 100% { opacity: 0; }
+  }
+  @keyframes mission-ping {
+    0% { transform: scale(1); opacity: 0.9; }
+    70%, 100% { transform: scale(3.2); opacity: 0; }
+  }
+</style>

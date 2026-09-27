@@ -1,0 +1,98 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import PageHero from "../../components/PageHero.astro";
+import ContentRail from "../../components/ContentRail.astro";
+import Icon from "../../components/Icon.astro";
+import { categories, stored } from "../../data/cookies";
+import { site } from "../../data/site";
+import { href, langPaths, translator, ui, type Lang } from "../../i18n";
+
+export const getStaticPaths = langPaths;
+const lang = Astro.params.lang as Lang;
+const t = translator(lang);
+const cols = [t({ cs: "Název", en: "Name" }), t({ cs: "Typ", en: "Type" }), t({ cs: "Účel", en: "Purpose" }), t({ cs: "Platnost", en: "Expiry" })];
+---
+
+<Layout lang={lang} title={ui.footer.cookies[lang]}>
+  <PageHero
+    title={ui.footer.cookies[lang]}
+    lead={t({
+      cs: "Co web ukládá do tvého prohlížeče a co načítá odjinud. Reklamní a sledovací cookies nepoužíváme.",
+      en: "What the site stores in your browser and what it loads from elsewhere. We use no advertising or tracking cookies.",
+    })}
+  >
+    <button type="button" class="btn btn-acid title-in mt-8" style="--i:4" data-consent-open>
+      <Icon name="cookie" /> {ui.footer.cookieSettings[lang]}
+    </button>
+  </PageHero>
+
+  <section class="relative mx-auto max-w-[1400px] px-4 py-16 sm:px-6 lg:pl-24">
+    <ContentRail label={ui.footer.cookies[lang]} />
+    <div class="grid gap-16">
+      {
+        categories.map((c, i) => {
+          const rows = stored.filter((s) => s.category === c.id);
+          return (
+            <section aria-labelledby={`cat-${c.id}`}>
+              <div class="flex flex-wrap items-baseline justify-between gap-4 border-b border-line pb-4">
+                <h2 id={`cat-${c.id}`} class="display flex items-baseline gap-4 text-2xl sm:text-3xl">
+                  <span class="mono text-sm text-acid">{String(i + 1).padStart(2, "0")}</span>
+                  {c.name[lang]}
+                </h2>
+                <p class="mono text-xs text-mute">
+                  {c.required ? t({ cs: "Vždy zapnuto", en: "Always on" }) : t({ cs: "Jen se souhlasem", en: "Only with consent" })}
+                </p>
+              </div>
+              <p class="mt-4 max-w-[65ch] leading-relaxed text-bone/75">{c.text[lang]}</p>
+              {rows.length ? (
+                <div class="mt-6 overflow-x-auto border border-line">
+                  <table class="w-full min-w-[40rem] text-left text-sm">
+                    <thead class="mono bg-coal text-xs text-mute">
+                      <tr>{cols.map((h) => <th scope="col" class="px-4 py-3 font-normal">{h}</th>)}</tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((r) => (
+                        <tr class="border-t border-line align-top">
+                          <th scope="row" class="mono px-4 py-4 font-normal break-all text-acid normal-case">
+                            {r.name}
+                            <span class="mt-1 block text-[0.7rem] text-mute uppercase">{r.provider}</span>
+                          </th>
+                          <td class="px-4 py-4 text-bone/80">{r.kind[lang]}</td>
+                          <td class="px-4 py-4 text-bone/80">{r.purpose[lang]}</td>
+                          <td class="mono px-4 py-4 text-xs whitespace-nowrap">{r.expiry[lang]}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p class="mono mt-6 border border-dashed border-line px-4 py-4 text-xs text-mute">
+                  {site.analytics.src
+                    ? t({ cs: "Seznam doplníme.", en: "List to follow." })
+                    : t({ cs: "Momentálně žádné statistické nástroje nepoužíváme. Až nějaký nasadíme, objeví se tady a spustí se jen s tvým souhlasem.", en: "We run no statistics tools right now. When we add one, it appears here and runs only with your consent." })}
+                </p>
+              )}
+            </section>
+          );
+        })
+      }
+
+      <section class="max-w-[65ch]" aria-labelledby="cookies-change">
+        <h2 id="cookies-change" class="display text-2xl">{t({ cs: "Změna a smazání", en: "Changing and deleting" })}</h2>
+        <div class="mt-4 space-y-4 leading-relaxed text-bone/75">
+          <p>
+            {t({
+              cs: "Souhlas můžeš kdykoli změnit nebo odvolat tlačítkem Nastavení cookies v patičce. Cookies smažeš i v nastavení prohlížeče, pak se tě při další návštěvě zeptáme znovu.",
+              en: "You can change or withdraw your consent at any time with the Cookie settings button in the footer. You can also delete cookies in your browser settings; we then ask again on your next visit.",
+            })}
+          </p>
+          <p>
+            {t({ cs: "Víc o tom, jak zacházíme s osobními údaji, najdeš na stránce ", en: "More on how we handle personal data is in our " })}
+            <a href={href(lang, "/privacy")} class="text-acid underline underline-offset-4 hover:text-bone">{ui.footer.privacy[lang]}</a>.
+          </p>
+        </div>
+      </section>
+    </div>
+    <p class="mono mt-16 text-xs text-mute">{t({ cs: "Poslední aktualizace: 27.09.2026", en: "Last updated: 27.09.2026" })}</p>
+  </section>
+</Layout>

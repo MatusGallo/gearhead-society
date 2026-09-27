@@ -1,0 +1,129 @@
+---
+/**
+ * Cargo stencil plate after the Marathon footer: a spaced numeral row, spec columns with a
+ * label over one to three value lines, two notice lines and a pixel glyph on the right.
+ * Every figure is the next event's real data (date, times, hours, coordinates, ticket waves);
+ * without a dated event the plate is not rendered. Columns flicker on as it scrolls in (`.boot-in`).
+ */
+import { formatNumeric, formatTime, nextEvent } from "../data/events";
+import { ui, type Lang } from "../i18n";
+
+interface Props {
+  lang: Lang;
+  /** Picks the pixel glyph (0..4), so pages differ; pass the same `hudVariant()` as the band */
+  variant?: number;
+  class?: string;
+}
+const { lang, variant = 0, class: cls = "" } = Astro.props;
+const e = nextEvent();
+const s = ui.spec;
+
+const tz = { timeZone: "Europe/Prague" } as const;
+const parts = (iso: string) =>
+  Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", { ...tz, day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+      .formatToParts(new Date(iso))
+      .map((p) => [p.type, p.value]),
+  );
+
+let numerals: string[] = [];
+let columns: { label: string; lines: string[] }[] = [];
+let notices: string[] = [];
+
+if (e?.start) {
+  const a = parts(e.start);
+  const hours = e.end ? Math.round((Date.parse(e.end) - Date.parse(e.start)) / 36e5) : undefined;
+  const coords = e.location?.coords;
+  const prices = e.tickets.map((t) => t.price).filter((p): p is number => p != null);
+  const b = e.end ? parts(e.end) : undefined;
+
+  numerals = [
+    a.day,
+    a.month,
+    a.year,
+    `${a.hour}${a.minute}`,
+    b && `${b.hour}${b.minute}`,
+    coords && coords[1].toFixed(5).replace(".", ""),
+    coords && coords[0].toFixed(5).replace(".", ""),
+    String(e.lineup.length || ""),
+    String(e.tickets.length || ""),
+  ].filter((n): n is string => !!n);
+
+  columns = [
+    { label: s.event[lang], lines: [e.title, e.edition[lang]] },
+    { label: s.date[lang], lines: [formatNumeric(e.start, lang), [formatTime(e.start), e.end && formatTime(e.end)].filter(Boolean).join(" / ")] },
+    ...(hours ? [{ label: s.duration[lang], lines: [`${hours} H`] }] : []),
+    { label: s.venue[lang], lines: [e.venue[lang], e.location ? `${e.location.district}, ${e.location.city[lang]}` : e.city[lang]] },
+    ...(coords ? [{ label: s.coords[lang], lines: [`${coords[1].toFixed(5)} N`, `${coords[0].toFixed(5)} E`] }] : []),
+    ...(prices.length ? [{ label: s.tickets[lang], lines: [`${prices.join(" / ")} CZK`, `${e.tickets.length} ${s.waves[lang]}`] }] : []),
+  ];
+
+  notices = [ui.footer.adults[lang], e.dressCode[lang].split(/[:.]/)[0]];
+}
+
+// Pixel glyphs, 5 x 4 cells: the reference mark, a gate, a chevron, a key and a crosshair
+const glyphs = [
+  [1, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1],
+  [1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 1],
+  [1, 0, 0, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 0, 0, 1, 0, 0],
+  [0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 0, 1, 0, 1, 1],
+  [0, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1],
+];
+const glyph = glyphs[((variant % 5) + 5) % 5];
+---
+
+{
+  e?.start && (
+    <div class:list={["spec-plate mono text-bone", cls]} aria-hidden="true">
+      <div class="boot-in min-w-0">
+        <p class="spec-nums flex flex-wrap gap-x-[2.2em] gap-y-1" style="--i:0">
+          {numerals.map((n) => <span>{n}</span>)}
+        </p>
+        <dl class="mt-5 grid grid-cols-2 gap-x-8 gap-y-4 sm:grid-cols-3 lg:flex lg:flex-wrap lg:gap-x-10">
+          {columns.map((c, i) => (
+            <div style={`--i:${i + 1}`}>
+              <dt>{c.label}</dt>
+              {c.lines.map((l) => <dd>{l}</dd>)}
+            </div>
+          ))}
+        </dl>
+        <p class="mt-5 flex flex-wrap gap-x-8 gap-y-1" style={`--i:${columns.length + 1}`}>
+          {notices.map((n) => <span>{n}</span>)}
+        </p>
+      </div>
+      <svg class="spec-glyph" viewBox="0 0 5 4" shape-rendering="crispEdges">
+        {glyph.map((on, i) => on && <rect x={i % 5} y={Math.floor(i / 5)} width="1" height="1" fill="currentColor" />)}
+      </svg>
+    </div>
+  )
+}
+
+<style>
+  .spec-plate {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 2rem;
+    font-size: 10px;
+    line-height: 1.15;
+    letter-spacing: 0.04em;
+  }
+  .spec-nums {
+    font-size: 11px;
+    letter-spacing: 0.35em;
+    font-variant-numeric: tabular-nums;
+  }
+  .spec-plate dd {
+    margin: 0;
+    color: var(--color-bone);
+  }
+  .spec-plate dt {
+    color: var(--color-bone);
+  }
+  .spec-glyph {
+    flex: none;
+    width: 2.6rem;
+    height: auto;
+    color: var(--color-bone);
+  }
+</style>

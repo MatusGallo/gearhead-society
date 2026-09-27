@@ -1,0 +1,622 @@
+---
+/**
+ * Operations-centre overlay for a ScanField (`slot="world"`): a squad of units closes in on
+ * the venue, the leader carries a beam and a T-minus tag, and the venue gets locked with a
+ * selection box and bracket labels. Modelled on the Marathon map sequences.
+ *
+ * Everything lives on the tilted map plane (CSS 3D, compositor only). Tags stand up as
+ * billboards; beams and light poles stand perpendicular to the map. One 14 s loop drives the
+ * approach, the lock and the reset. All text is real data passed in by the page.
+ * The ScanField pause button and reduced motion stop the loop in its locked state.
+ *
+ * `run="cue"` plays the sequence once each time an ancestor gets `[data-ops-run]` (the
+ * controller removes and re-adds it to restart), for heroes that cut to the map (HeroCycle).
+ * `flat` is for a real 2D map (HeroOpsMap): no tilted plane, so tags need no counter-tilt and
+ * the squad is one team on a route (see `team`); no lock cells, since the map shows the venue;
+ * the light poles are dropped; the leader's beam stands straight up. The lock sits at
+ * 63.5% / 25% of the layer; offset the layer to put that on the venue.
+ */
+import Countdown from "./Countdown.astro";
+import Icon from "./Icon.astro";
+
+interface Props {
+  /** Countdown target (ISO) for the leader's T-minus tag */
+  target: string;
+  countdownLabels: [string, string, string, string];
+  /** Lines for the lock label, e.g. ["SRAZ:49", "U Deštného v Orlických horách"] */
+  lock: string[];
+  /** Lines for the squad label, e.g. ["TÝM:3", "Sommers, Iglite, Magnas"] */
+  squad: string[];
+  /** "loop" repeats every 14 s; "cue" plays once per [data-ops-run] */
+  run?: "loop" | "cue";
+  flat?: boolean;
+}
+const { target, countdownLabels, lock, squad, run = "loop", flat = false } = Astro.props;
+
+// Pixel glyphs that show up on the lock, like the reference map sprites; drawn as box-shadow pixels
+const invader = [
+  "..X.....X..",
+  "...X...X...",
+  "..XXXXXXX..",
+  ".XX.XXX.XX.",
+  "XXXXXXXXXXX",
+  "X.XXXXXXX.X",
+  "X.X.....X.X",
+  "...XX.XX...",
+];
+const px = 3;
+const sprite = invader
+  .flatMap((row, y) => [...row].map((c, x) => (c === "X" ? `${x * px}px ${y * px}px 0 var(--ops-lock)` : null)))
+  .filter(Boolean)
+  .join(",");
+// On the flat map they turn up inside the lock, on the venue itself
+const spritesFlat = [
+  { x: 59.5, y: 20, d: 0 },
+  { x: 65.5, y: 22.5, d: 0.35 },
+  { x: 61.5, y: 28.5, d: 0.7 },
+];
+const sprites = [
+  { x: 72.5, y: 16, d: 0 },
+  { x: 76, y: 24.5, d: 0.35 },
+  { x: 71.5, y: 31, d: 0.7 },
+];
+
+// Final positions around the locked venue (percent of the map) and where each unit starts
+const units = [
+  { x: 58.5, y: 21, dx: -26, dy: 20, d: 0 },
+  { x: 63, y: 19.5, dx: -30, dy: 26, d: 0.25 },
+  { x: 67.5, y: 22.5, dx: -22, dy: 30, d: 0.5 },
+  { x: 61, y: 28, dx: -34, dy: 18, d: 0.15 },
+  { x: 66, y: 29.5, dx: -28, dy: 24, d: 0.4 },
+];
+
+// Flat map (home): three tactical teams come in from the city edge (S, off the frame) along
+// their own routes with one turn (W) and meet at the lock, each taking one side of it (E):
+// A from the east (the leader with beam, T-minus and lineup), B from the north, C from the
+// west. On the way the triangles ride in a tight wedge behind their leader (`travel`, rem);
+// on arrival the wedge opens into a line along the box edge (`hold`). `h1/h2` are the
+// leader's headings on each leg (deg, 0 = up). Percent of the layer; keyframes ops-team
+type Team = { id: string; s: number[]; w: number[]; e: number[]; d: number; h1: number; h2: number; travel: number[][]; hold: number[][] };
+const teams: Team[] = [
+  {
+    id: "A", s: [118, 40], w: [92, 40], e: [71, 26], d: 0.1, h1: -90, h2: -63,
+    travel: [[1.3, -0.8], [1.3, 0.8], [2.6, -1.5], [2.6, 1.5]],
+    hold: [[0.2, -1.7], [0.2, 1.7], [0.2, -3.3], [0.2, 3.3]],
+  },
+  {
+    id: "B", s: [72, -35], w: [76, 4], e: [63.5, 16], d: 0.45, h1: 172, h2: -126,
+    travel: [[-0.8, -1.3], [0.8, -1.3], [0, -2.6]],
+    hold: [[-1.8, -0.2], [1.8, -0.2], [3.6, -0.2]],
+  },
+  {
+    id: "C", s: [-12, 30], w: [34, 33], e: [56.5, 26], d: 0.25, h1: 87, h2: 77,
+    travel: [[-1.3, -0.8], [-1.3, 0.8], [-2.6, 0]],
+    hold: [[-0.2, -1.7], [-0.2, 1.7], [-0.2, 3.3]],
+  },
+];
+const rel = (t: Team, p: number[]) => `${p[0] - t.e[0]}%, ${p[1] - t.e[1]}%`;
+const teamVars = (t: Team, d = t.d) => `--team-s:${rel(t, t.s)};--team-w:${rel(t, t.w)};--d:${d}s;--h1:${t.h1}deg;--h2:${t.h2}deg`;
+const teamLine = (t: Team) => [t.s, t.w, t.e].map((p) => p.join(",")).join(" ");
+const teamArrows = teams.flatMap((t) =>
+  [
+    [t.s, t.w],
+    [t.w, t.e],
+  ].map(([a, b]) => ({ x: (a[0] + b[0]) / 2, y: (a[1] + b[1]) / 2, deg: (Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI })),
+);
+const rem = ([x, y]: number[]) => `${x}rem ${y}rem`;
+const tris = (t: Team) => t.travel.map((tr, i) => `--t:${rem(tr)};--h:${rem(t.hold[i])}`);
+const trail = [0.3, 0.6];
+const [lead, ...others] = teams;
+const poles = [
+  { x: 18, y: 30, h: 34 },
+  { x: 81, y: 26, h: 40 },
+  { x: 30, y: 68, h: 28 },
+  { x: 76, y: 62, h: 30 },
+];
+---
+
+<div
+  class:list={["ops", run === "cue" && "ops-cue", flat && "ops-flat"]}
+  aria-hidden="true"
+  style={`--sprite:${sprite}`}
+>
+  {
+    !flat &&
+      poles.map((p) => (
+        <span class="ops-pole" style={`left:${p.x}%;top:${p.y}%;--h:${p.h}cqh`}>
+          <span class="ops-glow" />
+        </span>
+      ))
+  }
+
+  <!-- Venue lock; on the real map it stays an empty box over the venue itself -->
+  <div class="ops-box" style="left:57%;top:17%;width:13%;height:16%">
+    {
+      !flat && (
+        <>
+          <span class="ops-cell" style="left:12%;top:14%" />
+          <span class="ops-cell" style="left:58%;top:30%" />
+          <span class="ops-cell" style="left:30%;top:62%" />
+        </>
+      )
+    }
+  </div>
+  <div class="ops-bill ops-lock-tag" style="left:57%;top:6%">
+    <p class="ops-tag">{lock.map((l) => <span>[{l}]</span>)}</p>
+  </div>
+
+  {
+    (flat ? spritesFlat : sprites).map((s) => (
+      <div class="ops-bill ops-sprite" style={`left:${s.x}%;top:${s.y}%;--sd:${s.d}s`}>
+        <span />
+      </div>
+    ))
+  }
+
+  <!-- Squad: separate units closing in (tilted map), or one team on a route (flat map) -->
+  {
+    flat ? (
+      <>
+        <svg class="ops-route" viewBox="0 0 100 100" preserveAspectRatio="none">
+          {teams.map((t) => <polyline points={teamLine(t)} />)}
+        </svg>
+        {teamArrows.map((a) => <span class="ops-arrow" style={`left:${a.x}%;top:${a.y}%;rotate:${a.deg}deg`} />)}
+        {teams.flatMap((t) =>
+          trail.map((lag, k) => (
+            <div class="ops-track ops-team" style={teamVars(t, t.d + lag)}>
+              <span class="ops-ghost" style={`left:${t.e[0]}%;top:${t.e[1]}%;--o:${0.5 - k * 0.18}`} />
+            </div>
+          )),
+        )}
+        {others.map((t) => (
+          <div class="ops-track ops-team" style={teamVars(t)}>
+            <div class="ops-leader" style={`left:${t.e[0]}%;top:${t.e[1]}%`}>
+              <span class="ops-ping" />
+              <span class="ops-chevron" />
+              {tris(t).map((v) => <span class="ops-tri" style={v} />)}
+              <span class="ops-sq">[SQ-{t.id}]</span>
+            </div>
+          </div>
+        ))}
+      </>
+    ) : (
+      units.map((u) => (
+        <div class="ops-track" style={`--dx:${u.dx}%;--dy:${u.dy}%;--d:${u.d}s`}>
+          <span class="ops-unit" style={`left:${u.x}%;top:${u.y}%`} />
+        </div>
+      ))
+    )
+  }
+  <div class:list={["ops-track ops-lead", flat && "ops-team"]} style={flat ? teamVars(lead) : "--dx:-24%;--dy:26%;--d:0.1s"}>
+    <div class="ops-leader" style={flat ? `left:${lead.e[0]}%;top:${lead.e[1]}%` : "left:54.5%;top:25%"}>
+      <span class="ops-beam"></span>
+      {flat && <span class="ops-ping" />}
+      <span class="ops-chevron"></span>
+      {flat && tris(lead).map((v) => <span class="ops-tri" style={v} />)}
+      <div class="ops-bill ops-side" style="--top:-0.2rem">
+        <p class="ops-timer">T-<Countdown target={target} labels={countdownLabels} compact /></p>
+      </div>
+      <div class="ops-bill ops-side" style="--top:2.1rem">
+        <p class="ops-tag ops-tag-squad">
+          {squad.map((l, i) => (
+            <span class:list={[i === 0 && "inline-flex items-center gap-1"]}>
+              {i === 0 && <Icon name="person" class="size-3" />}[{l}]
+            </span>
+          ))}
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* Lock colour stays the map-marker yellow even where the page accent is violet (Sommers) */
+  .ops {
+    --ops-lock: #c0fe04;
+  }
+  .ops,
+  .ops-track,
+  .ops-leader {
+    position: absolute;
+    inset: 0;
+    transform-style: preserve-3d;
+    pointer-events: none;
+  }
+  .ops-leader {
+    inset: auto;
+    width: 1.4rem;
+    height: 1rem;
+  }
+
+  /* Poles and beams stand up out of the map plane */
+  .ops-pole {
+    position: absolute;
+    width: 2px;
+    height: var(--h);
+    transform-origin: 50% 100%;
+    transform: translateY(-100%) rotateX(-90deg);
+    background: linear-gradient(to top, rgb(180 200 255 / 0.05), rgb(180 200 255 / 0.35));
+  }
+  .ops-glow {
+    position: absolute;
+    top: -4px;
+    left: 50%;
+    width: 26px;
+    height: 9px;
+    translate: -50% 0;
+    background: rgb(200 215 255 / 0.9);
+    box-shadow: 0 0 14px 4px rgb(160 185 255 / 0.55);
+  }
+  .ops-beam {
+    position: absolute;
+    left: 50%;
+    bottom: 50%;
+    width: 1px;
+    height: 70cqh;
+    transform-origin: 50% 100%;
+    transform: rotateX(-90deg);
+    background: linear-gradient(to top, #ff6a2d, rgb(255 106 45 / 0.15));
+  }
+
+  /* Billboards: counter the map tilt so labels face the viewer */
+  .ops-bill {
+    position: absolute;
+    transform-origin: 0 100%;
+    transform: rotateX(-38deg);
+  }
+  .ops-side {
+    left: 1.6rem;
+    top: var(--top);
+  }
+  @media (max-width: 639px) {
+    .ops-side {
+      left: auto;
+      right: 1.6rem;
+      transform-origin: 100% 100%;
+    }
+    .ops-side .ops-tag { justify-items: end; }
+    .ops-tag-squad span:last-child {
+      max-width: 11rem;
+      white-space: normal;
+      text-align: right;
+    }
+    .ops-lock-tag {
+      left: 70% !important;
+      translate: -100% 0;
+      transform-origin: 100% 100%;
+    }
+    .ops-lock-tag .ops-tag { justify-items: end; }
+  }
+  .ops-tag,
+  .ops-timer {
+    font: 500 11px/1.35 var(--font-mono);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .ops-tag {
+    display: grid;
+    padding: 0.35rem 0.5rem;
+    color: var(--ops-lock);
+    background: rgb(7 7 7 / 0.75);
+  }
+  .ops-tag-squad {
+    color: #ffb08a;
+  }
+  /* Long name lists wrap instead of running off the map */
+  .ops-tag-squad span:last-child {
+    width: max-content;
+    max-width: 19rem;
+    white-space: normal;
+  }
+  .ops-timer {
+    padding: 0.2rem 0.45rem;
+    background: #ff6a2d;
+    color: var(--color-ink);
+    font-weight: 600;
+  }
+
+  .ops-box {
+    position: absolute;
+    border: 1px dashed var(--ops-lock);
+    background: color-mix(in oklab, var(--ops-lock) 0%, transparent);
+  }
+  .ops-cell {
+    position: absolute;
+    width: 26%;
+    height: 18%;
+    border: 2px solid var(--ops-lock);
+  }
+  .ops-unit {
+    position: absolute;
+    width: 1.9%;
+    height: 1.3%;
+    border: 2px solid #ff6a2d;
+  }
+  .ops-flat .ops-bill { transform: none; }
+  /* Flat map: the run starts only after the camera has landed, so it is shorter, and nothing
+     shows before it is cued (the peek lens shows the locked resting state) */
+  .ops-flat { --run: 10s; }
+  .ops-flat.ops-cue {
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  :global([data-ops-run]) .ops-flat.ops-cue,
+  :global([data-peek]) .ops-flat.ops-cue {
+    opacity: 1;
+  }
+  /* Team A ends on the right edge of the lock, so its tags sit right of it, on phones too */
+  .ops-flat .ops-side {
+    left: 2rem;
+    right: auto;
+  }
+  @media (max-width: 639px) {
+    .ops-flat .ops-side { transform-origin: 0 100%; }
+    .ops-flat .ops-side .ops-tag { justify-items: start; }
+    .ops-flat .ops-tag-squad span:last-child { max-width: 9rem; text-align: left; }
+  }
+  .ops-flat .ops-beam { transform: none; height: 45cqh; }
+  /* Team: triangle contacts like the Marathon markers, the colour is the fill of an outline mask */
+  .ops-tri { translate: var(--h); }
+  /* On the flat map the leader is a sharp arrowhead that turns with its route */
+  .ops-flat .ops-chevron {
+    inset: -0.15rem 0.1rem;
+    rotate: var(--h2, 0deg);
+    clip-path: polygon(50% 0, 100% 100%, 50% 72%, 0 100%);
+  }
+  .ops-sq {
+    position: absolute;
+    left: 1.7rem;
+    top: -1.3rem;
+    padding: 0.1rem 0.35rem;
+    background: #ff6a2d;
+    color: var(--color-ink);
+    font: 600 10px/1.3 var(--font-mono);
+    white-space: nowrap;
+  }
+  .ops-ping {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 4rem;
+    height: 4rem;
+    margin: -2rem 0 0 -2rem;
+    border: 1px solid var(--ops-lock);
+    border-radius: 50%;
+    opacity: 0;
+  }
+  .ops-tri,
+  .ops-ghost {
+    position: absolute;
+    left: 0.2rem;
+    top: 0;
+    width: 18px;
+    height: 16px;
+    background-color: var(--ops-lock);
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 16'%3E%3Cpath d='M9 2 16.5 14.5h-15Z' fill='none' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+  .ops-ghost {
+    left: auto;
+    translate: 0.2rem 0;
+    background-color: #ff6a2d;
+    opacity: 0;
+  }
+  .ops-route {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    opacity: 0.6;
+  }
+  .ops-route polyline {
+    fill: none;
+    stroke: var(--ops-lock);
+    stroke-width: 1.5;
+    stroke-dasharray: 6 5;
+    vector-effect: non-scaling-stroke;
+  }
+  .ops-arrow {
+    position: absolute;
+    width: 9px;
+    height: 9px;
+    margin: -4.5px 0 0 -4.5px;
+    border-top: 2px solid var(--ops-lock);
+    border-right: 2px solid var(--ops-lock);
+    transform: rotate(45deg);
+    opacity: 0.8;
+  }
+  .ops-sprite span {
+    display: block;
+    width: 2px;
+    height: 2px;
+    box-shadow: var(--sprite);
+  }
+  .ops-chevron {
+    position: absolute;
+    inset: 0;
+    background: #ff6a2d;
+    clip-path: polygon(50% 0, 100% 55%, 100% 100%, 64% 100%, 50% 72%, 36% 100%, 0 100%, 0 55%);
+  }
+
+  /* Locked state is the resting state: reduced motion and pause show it */
+  .ops-box { background: color-mix(in oklab, var(--ops-lock) 32%, transparent); }
+  .ops-unit { border-color: var(--ops-lock); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .ops-track {
+      animation: ops-approach var(--run, 14s) cubic-bezier(0.45, 0, 0.2, 1) infinite;
+      animation-delay: var(--d, 0s);
+    }
+    /* Opacity lives on the leaves: on a preserve-3d parent it would flatten the beam */
+    .ops-unit {
+      animation: ops-unit var(--run, 14s) linear infinite;
+      animation-delay: var(--d, 0s);
+    }
+    .ops-leader > * {
+      animation: ops-fade var(--run, 14s) linear infinite;
+      animation-delay: 0.1s;
+    }
+    .ops-box {
+      animation: ops-lock var(--run, 14s) linear infinite;
+    }
+    .ops-lock-tag {
+      animation: ops-tag var(--run, 14s) steps(1, end) infinite;
+    }
+    .ops-sprite {
+      animation: ops-sprite var(--run, 14s) steps(1, end) infinite;
+      animation-delay: var(--sd, 0s);
+    }
+    /* Cue mode: nothing plays until [data-ops-run], then the sequence runs once */
+    .ops-cue .ops-track,
+    .ops-cue .ops-unit,
+    .ops-cue .ops-leader > *,
+    .ops-cue .ops-box,
+    .ops-cue .ops-lock-tag,
+    .ops-cue .ops-sprite {
+      animation-name: none;
+      animation-iteration-count: 1;
+      animation-fill-mode: both;
+    }
+    :global([data-ops-run]) .ops-cue .ops-track { animation-name: ops-approach; }
+    :global([data-ops-run]) .ops-cue .ops-unit { animation-name: ops-unit; }
+    :global([data-ops-run]) .ops-cue .ops-leader > * { animation-name: ops-fade; }
+    :global([data-ops-run]) .ops-cue .ops-box { animation-name: ops-lock; }
+    :global([data-ops-run]) .ops-cue .ops-lock-tag { animation-name: ops-tag; }
+    :global([data-ops-run]) .ops-cue .ops-sprite { animation-name: ops-sprite; }
+    /* Flat map (home) gets its own sequence, so it never plays like Sommers: the squad travels
+       as one team along a route in from the city, its trail fading behind it, and the lock
+       reticle contracts onto the venue in steps before it fills */
+    :global([data-ops-run]) .ops-flat.ops-cue .ops-team {
+      animation-name: ops-team;
+      animation-timing-function: cubic-bezier(0.45, 0, 0.3, 1);
+    }
+    :global([data-ops-run]) .ops-flat.ops-cue .ops-tri {
+      animation-name: ops-unit-tri, ops-form;
+      animation-delay: var(--d);
+    }
+    :global([data-ops-run]) .ops-flat.ops-cue .ops-chevron {
+      animation: ops-fade var(--run, 14s) linear var(--d) both, ops-heading var(--run, 14s) linear var(--d) both;
+    }
+    :global([data-ops-run]) .ops-flat.ops-cue .ops-ping { animation: ops-ping var(--run, 14s) ease-out var(--d) both; }
+    :global([data-ops-run]) .ops-flat.ops-cue .ops-sq { animation-delay: var(--d); }
+    :global([data-ops-run]) .ops-flat.ops-cue .ops-ghost { animation: ops-ghost var(--run, 14s) linear var(--d) both; }
+    :global([data-ops-run]) .ops-flat.ops-cue .ops-route,
+    :global([data-ops-run]) .ops-flat.ops-cue .ops-arrow { animation: ops-route var(--run, 14s) linear both; }
+    :global([data-ops-run]) .ops-flat.ops-cue .ops-box {
+      animation-name: ops-acquire;
+      animation-timing-function: steps(5, end);
+    }
+    :global([data-cycle-paused]) .ops-ghost,
+    :global([data-cycle-paused]) .ops-tri,
+    :global([data-cycle-paused]) .ops-chevron,
+    :global([data-cycle-paused]) .ops-ping,
+    :global([data-cycle-paused]) .ops-route,
+    :global([data-cycle-paused]) .ops-arrow {
+      animation-play-state: paused;
+    }
+    :global(.scan[data-paused]) .ops-track,
+    :global(.scan[data-paused]) .ops-unit,
+    :global(.scan[data-paused]) .ops-leader > *,
+    :global(.scan[data-paused]) .ops-box,
+    :global(.scan[data-paused]) .ops-lock-tag,
+    :global(.scan[data-paused]) .ops-sprite,
+    :global([data-cycle-paused]) .ops-track,
+    :global([data-cycle-paused]) .ops-unit,
+    :global([data-cycle-paused]) .ops-leader > *,
+    :global([data-cycle-paused]) .ops-box,
+    :global([data-cycle-paused]) .ops-lock-tag,
+    :global([data-cycle-paused]) .ops-sprite {
+      animation-play-state: paused;
+    }
+  }
+  /* Approach with one turn, hold while locked, vanish and respawn */
+  @keyframes ops-approach {
+    0% { transform: translate(var(--dx), var(--dy)); }
+    30% { transform: translate(calc(var(--dx) * 0.45), calc(var(--dy) * 0.75)); }
+    55%, 100% { transform: none; }
+  }
+  @keyframes ops-unit-tri {
+    0% { opacity: 0; background-color: #ff6a2d; }
+    4% { opacity: 1; }
+    55% { background-color: #ff6a2d; }
+    58% { background-color: var(--ops-lock); }
+    92% { opacity: 1; }
+    97%, 100% { opacity: 0; background-color: var(--ops-lock); }
+  }
+  /* In off the frame, one turn, into the lock by 50% (the camera lands at the same moment) */
+  @keyframes ops-team {
+    0% { transform: translate(var(--team-s)); }
+    24% { transform: translate(var(--team-w)); }
+    50%, 100% { transform: none; }
+  }
+  /* Wedge on the move, opening into a line along the box edge as the team arrives */
+  @keyframes ops-form {
+    0%, 46% { translate: var(--t); }
+    56%, 100% { translate: var(--h); }
+  }
+  /* Leader turns with the route */
+  @keyframes ops-heading {
+    0%, 21% { rotate: var(--h1); }
+    27%, 100% { rotate: var(--h2); }
+  }
+  /* Arrival ping, one ring as the team takes its side */
+  @keyframes ops-ping {
+    0%, 49% { opacity: 0; scale: 0.2; }
+    50% { opacity: 1; scale: 0.2; }
+    58%, 100% { opacity: 0; scale: 1.6; }
+  }
+  @keyframes ops-ghost {
+    0% { opacity: 0; }
+    4%, 44% { opacity: var(--o); }
+    50%, 100% { opacity: 0; }
+  }
+  @keyframes ops-route {
+    0% { opacity: 0; }
+    4%, 52% { opacity: 0.6; }
+    62%, 100% { opacity: 0; }
+  }
+  @keyframes ops-acquire {
+    0%, 34% { opacity: 0; scale: 2.6; background: transparent; border-color: var(--ops-lock); }
+    35% { opacity: 1; scale: 2.6; }
+    54% { scale: 1; background: transparent; }
+    56% { background: color-mix(in oklab, var(--ops-lock) 45%, transparent); }
+    58% { background: transparent; }
+    60%, 94% { opacity: 1; scale: 1; background: color-mix(in oklab, var(--ops-lock) 32%, transparent); }
+    100% { opacity: 0; scale: 1; }
+  }
+  @keyframes ops-fade {
+    0% { opacity: 0; }
+    4%, 92% { opacity: 1; }
+    97%, 100% { opacity: 0; }
+  }
+  @keyframes ops-unit {
+    0% { opacity: 0; border-color: #ff6a2d; }
+    4% { opacity: 1; }
+    55% { border-color: #ff6a2d; }
+    58% { border-color: var(--ops-lock); }
+    92% { opacity: 1; }
+    97%, 100% { opacity: 0; border-color: var(--ops-lock); }
+  }
+  @keyframes ops-lock {
+    0%, 56% { background: transparent; border-color: rgb(192 254 4 / 0.35); }
+    57% { background: color-mix(in oklab, var(--ops-lock) 45%, transparent); border-color: var(--ops-lock); }
+    59% { background: transparent; }
+    61%, 94% { background: color-mix(in oklab, var(--ops-lock) 32%, transparent); border-color: var(--ops-lock); }
+    100% { background: transparent; border-color: rgb(192 254 4 / 0.35); }
+  }
+  /* Sprites blink in after the lock and hop between two spots, like tracked contacts */
+  @keyframes ops-sprite {
+    0%, 59% { opacity: 0; translate: 0 0; }
+    60% { opacity: 1; }
+    62% { opacity: 0.2; }
+    64%, 72% { opacity: 1; translate: 0 0; }
+    73%, 82% { translate: 6px -4px; }
+    83%, 93% { opacity: 1; translate: 0 0; }
+    95%, 100% { opacity: 0; }
+  }
+  @keyframes ops-tag {
+    0% { opacity: 0; }
+    58% { opacity: 1; }
+    95% { opacity: 0; }
+  }
+</style>

@@ -1,0 +1,133 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import PageHero from "../../components/PageHero.astro";
+import ContentRail from "../../components/ContentRail.astro";
+import LegalList from "../../components/LegalList.astro";
+import { operatorLine, site } from "../../data/site";
+import { langPaths, translator, ui, type Lang, type L } from "../../i18n";
+
+export const getStaticPaths = langPaths;
+const lang = Astro.params.lang as Lang;
+const t = translator(lang);
+const { maxPerOrder, payDays } = site.orders;
+
+// TODO: mock copy, have it reviewed by a lawyer before launch (refund and entry rules especially)
+const sections: [L, L<string[]>][] = [
+  [
+    { cs: "Kdo vstupenky prodává", en: "Who sells the tickets" },
+    {
+      cs: [
+        `Vstupenky na akce Gearhead Society prodáváme my, ${operatorLine("cs")}. Zároveň akce pořádáme.`,
+        `Kontakt pro vše kolem vstupenek: ${site.email}.`,
+      ],
+      en: [
+        `Tickets for Gearhead Society events are sold by us, ${operatorLine("en")}. We also organise the events.`,
+        `Contact for anything about tickets: ${site.email}.`,
+      ],
+    },
+  ],
+  [
+    { cs: "Objednávka", en: "Ordering" },
+    {
+      cs: [
+        `Vstupenky objednáš formulářem na stránce akce. V jedné objednávce může být nejvýš ${maxPerOrder} vstupenky.`,
+        "Smlouva mezi námi vzniká ve chvíli, kdy ti objednávku potvrdíme e-mailem. Do té doby ji můžeme odmítnout, například když je vlna vyprodaná.",
+      ],
+      en: [
+        `You order tickets with the form on the event page. One order holds up to ${maxPerOrder} tickets.`,
+        "The contract between us is made when we confirm your order by e-mail. Until then we may decline it, for example when the wave has sold out.",
+      ],
+    },
+  ],
+  [
+    { cs: "Cena a platba", en: "Price and payment" },
+    {
+      cs: [
+        "Vstupenky se prodávají ve vlnách: early bird, classic a late runner. Každá další vlna je dražší. Platí cena vlny, ve které objednávku odešleš. Ceny jsou konečné v CZK.",
+        `Platební údaje ti pošleme v potvrzení. Zaplať do ${payDays} dnů, jako variabilní symbol uveď číslo objednávky. Nezaplacená objednávka potom propadne a vstupenky se vrátí do prodeje.`,
+      ],
+      en: [
+        "Tickets sell in waves: early bird, classic and late runner. Each wave costs more than the last. You pay the price of the wave you ordered in. Prices are final, in CZK.",
+        `The payment details come with the confirmation. Pay within ${payDays} days, using the order number as the payment reference. After that an unpaid order lapses and the tickets go back on sale.`,
+      ],
+    },
+  ],
+  [
+    { cs: "Vstupenka", en: "Your ticket" },
+    {
+      cs: [
+        "Po zaplacení ti vstupenka přijde e-mailem. Je na jméno a u vstupu ji porovnáme s dokladem.",
+        "Nemůžeš přijít? Vstupenku můžeš přepsat na jiného člověka: pošli nám jeho jméno nejpozději 48 hodin před začátkem akce. Přeprodej za vyšší cenu nepovolujeme, takové vstupenky rušíme.",
+      ],
+      en: [
+        "Once paid, your ticket arrives by e-mail. It is in your name and checked against your ID at the door.",
+        "Can't make it? You can move the ticket to someone else: send us their name at least 48 hours before the event starts. Reselling above face value is not allowed and such tickets are cancelled.",
+      ],
+    },
+  ],
+  [
+    { cs: "Vstup na akci", en: "Entry" },
+    {
+      cs: [
+        "Vstup je jen od 18 let s platným dokladem s fotkou. Bez něj nepustíme nikoho, ani s vstupenkou.",
+        "U vstupu kontrolujeme dress code dané akce a platí naše pravidla chování. Kdo nesplní věk nebo dress code, nebo pravidla poruší, nemusí být vpuštěn nebo může být vyveden. V takovém případě se vstupné nevrací.",
+      ],
+      en: [
+        "Entry is 18+ only with a valid photo ID. Without it we let no one in, ticket or not.",
+        "The event's dress code is checked at the door and our code of conduct applies. Anyone under age, not meeting the dress code or breaking the rules may be refused entry or asked to leave. The ticket price is not refunded in that case.",
+      ],
+    },
+  ],
+  [
+    { cs: "Vrácení vstupenky", en: "Refunds" },
+    {
+      cs: [
+        "Vstupenky jsou na akci s pevným datem, proto podle § 1837 písm. j) občanského zákoníku nelze od koupě odstoupit do 14 dnů bez udání důvodu.",
+        "Když akci zrušíme, vrátíme ti celou cenu do 14 dnů na účet, ze kterého přišla platba, nebo na účet, který nám pošleš. Když ji přesuneme na jiný termín, vstupenka platí dál. Pokud ti nový termín nevyhovuje, napiš nám do 14 dnů od oznámení a peníze vrátíme.",
+      ],
+      en: [
+        "Tickets are for an event on a fixed date, so under Section 1837(j) of the Czech Civil Code there is no 14-day right of withdrawal.",
+        "If we cancel an event, we refund the full price within 14 days. If we move it to a new date, your ticket stays valid. If the new date doesn't work for you, write to us within 14 days of the announcement and we refund you.",
+      ],
+    },
+  ],
+  [
+    { cs: "Reklamace a spory", en: "Complaints and disputes" },
+    {
+      cs: [
+        `Reklamace a stížnosti posílej na ${site.email}. Vyřídíme je bez zbytečného odkladu, nejpozději do 30 dnů.`,
+        "Pokud se nedohodneme, můžeš se jako spotřebitel obrátit na Českou obchodní inspekci (coi.cz), která řeší spotřebitelské spory mimosoudně.",
+      ],
+      en: [
+        `Send complaints to ${site.email}. We handle them without undue delay, within 30 days at the latest.`,
+        "If we can't agree, as a consumer you can turn to the Czech Trade Inspection Authority (coi.cz), which settles consumer disputes out of court.",
+      ],
+    },
+  ],
+  [
+    { cs: "Závěrem", en: "Final provisions" },
+    {
+      cs: [
+        "Jak zacházíme s tvými údaji, popisuje stránka Ochrana soukromí. Tyto podmínky se řídí českým právem.",
+        "Podmínky můžeme změnit. Pro tvoji objednávku platí znění ke dni jejího odeslání.",
+      ],
+      en: [
+        "How we handle your data is described in the privacy policy. These terms are governed by Czech law.",
+        "We may change these terms. Your order is governed by the version in force on the day you placed it.",
+      ],
+    },
+  ],
+];
+---
+
+<Layout lang={lang} title={ui.footer.terms[lang]}>
+  <PageHero
+    title={ui.footer.terms[lang]}
+    lead={t({ cs: "Jak funguje nákup vstupenek, vstup na akci a vrácení peněz. Krátce a bez kliček.", en: "How buying tickets, getting in and refunds work. Short and straight." })}
+  />
+  <section class="relative mx-auto max-w-3xl px-4 py-16 sm:px-6 lg:max-w-[54rem] lg:pl-24">
+    <ContentRail label={ui.footer.terms[lang]} />
+    <LegalList lang={lang} sections={sections} />
+    <p class="mono mt-10 text-xs text-mute">{t({ cs: "Platné od: 27.09.2026", en: "In force from: 27.09.2026" })}</p>
+  </section>
+</Layout>

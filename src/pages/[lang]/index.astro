@@ -1,0 +1,364 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import Countdown from "../../components/Countdown.astro";
+import EventCard from "../../components/EventCard.astro";
+import MissionLayer from "../../components/MissionLayer.astro";
+import MissionLog from "../../components/MissionLog.astro";
+import GalleryCard from "../../components/GalleryCard.astro";
+import Icon from "../../components/Icon.astro";
+import ScanField from "../../components/ScanField.astro";
+import SectionHeading from "../../components/SectionHeading.astro";
+import HeroPlate from "../../components/HeroPlate.astro";
+import HudRail from "../../components/HudRail.astro";
+import ContentRail from "../../components/ContentRail.astro";
+import HeroCycle from "../../components/HeroCycle.astro";
+import HeroOpsMap from "../../components/HeroOpsMap.astro";
+import Visual from "../../components/Visual.astro";
+import { formatDate, formatNumeric, formatPrice, formatTime, nextEvent, ticketWaves, upcomingEvents } from "../../data/events";
+import { galleries } from "../../data/galleries";
+import { ph, placeholder } from "../../data/placeholder";
+import { site } from "../../data/site";
+import { dissolve } from "../../data/dissolve";
+import { href, langPaths, translator, ui, type Lang } from "../../i18n";
+
+export const getStaticPaths = langPaths;
+const lang = Astro.params.lang as Lang;
+const t = translator(lang);
+
+const next = nextEvent();
+const upcoming = upcomingEvents().slice(0, 4);
+const latest = galleries.slice(0, 4);
+const zones = ui.zones[lang];
+// The night as a route: door, cloakroom, floor, bar, chill
+const route = [4, 1, 0, 2, 3].map((i) => zones[i]);
+const heroPhoto = placeholder("smoke-room");
+// Ops map for the hero cycle: only when the venue has a published address (real data only)
+const loc = next?.location;
+const opsMap =
+  next?.start && loc
+    ? {
+        location: loc,
+        place: loc.district,
+        lock: [`${t({ cs: "Cíl", en: "Target" })}:${next.title}`, next.venue[lang], `${loc.street}, ${loc.district}`, `${loc.coords[1].toFixed(5)}N ${loc.coords[0].toFixed(5)}E`],
+        squad: next.lineup.length ? [`Lineup:${next.lineup.length}`, next.lineup.join(", ")] : [t({ cs: "Lineup brzy", en: "Lineup soon" })],
+      }
+    : undefined;
+// "Strict gear: rubber, leather, uniform, sportswear, puppy gear. No street..." -> the list only
+const gearList = next?.dressCode[lang].match(/:\s*([^.]+)\./)?.[1];
+const gearItems = gearList?.split(/,\s*/) ?? [];
+const gearLines = [gearItems.slice(0, 3).join(", "), gearItems.slice(3).join(", ")].filter(Boolean);
+const scanCopy = { pauseLabel: ui.pause[lang], playLabel: ui.play[lang] };
+
+
+const nightTiles = [
+  { tag: t({ cs: "Parket", en: "Floor" }), icon: "speaker-high", photo: ph("fire-crew"), title: zones[0], text: t({ cs: "Tvrdě, temně a nahlas až do rána.", en: "Hard, dark and loud until morning." }) },
+  { tag: t({ cs: "Vstup", en: "Door" }), icon: "coat-hanger", photo: ph("boots-line"), title: zones[1], text: t({ cs: "Převlékárna a hlídaná šatna.", en: "Changing room and a secure cloakroom." }) },
+  { tag: t({ cs: "Foto", en: "Photo" }), icon: "camera", photo: ph("helmet-hand"), title: t({ cs: "Fotostěna", en: "Photo wall" }), text: t({ cs: "Profi focení, jen když chceš.", en: "Professional shoot, only if you want it." }) },
+  { tag: t({ cs: "Pauza", en: "Rest" }), icon: "drop", photo: ph("turnout"), title: zones[3], text: t({ cs: "Voda, sezení a klidnější kout.", en: "Water, seating and a quieter corner." }) },
+];
+
+const values = [
+  { title: t({ cs: "Respekt na prvním místě", en: "Respect first" }), text: t({ cs: "Souhlas není volitelný. Awareness tým nosí žluté pásky na ruce.", en: "Consent is not optional. The awareness team wears yellow armbands." }) },
+  { title: t({ cs: "Zvuk, který cítíš", en: "Sound that hits" }), text: t({ cs: "Pečlivě vybraní DJové a pořádný zvuk celou noc.", en: "Curated DJs and a proper sound system, all night." }) },
+  { title: t({ cs: "Obleč se na to", en: "Dress the part" }), text: t({ cs: "Gear je u vstupu povinný. Převlékárna je na místě.", en: "Gear is required at the door. Changing room on site." }) },
+];
+
+// Real event data only, laid out as a technical readout
+const readout = next
+  ? [
+      [t({ cs: "Datum", en: "Date" }), formatDate(next.start, lang)],
+      [t({ cs: "Otevíráme", en: "Doors" }), formatTime(next.start)],
+      [t({ cs: "Konec", en: "Close" }), formatTime(next.end)],
+      [t({ cs: "Město", en: "City" }), next.city[lang]],
+      [t({ cs: "Edice", en: "Edition" }), next.edition[lang]],
+      [t({ cs: "Vstup", en: "Entry" }), t({ cs: "18+, doklad s fotkou", en: "18+, photo ID" })],
+      ...ticketWaves(next).map((w) => [
+        w.name[lang],
+        w.state === "past" ? `${formatPrice(w.price)}, ${t({ cs: "vyprodáno", en: "sold out" })}` : w.state === "current" ? `${formatPrice(w.price)}, ${t({ cs: "teď v prodeji", en: "on sale now" })}` : formatPrice(w.price),
+      ]),
+    ]
+  : [];
+---
+
+<Layout lang={lang}>
+  <!-- HERO: graded photo (HeroPlate) that cuts to the ops map of the venue and back (HeroCycle),
+       HUD strip with the next night, letter-by-letter wordmark rail -->
+  <section class="grid pt-15 lg:h-[100dvh] lg:min-h-[40rem] lg:grid-cols-[1fr_20rem]">
+    <div class="relative order-2 flex min-h-[82dvh] flex-col sm:min-h-[75dvh] justify-end overflow-hidden lg:order-1 lg:min-h-0" data-pointer data-cycle={opsMap ? "" : undefined}>
+      <!-- Live-feed read of the photo: tracking boxes lock onto the helmet and the gear -->
+      <div class="hero-tri absolute inset-0" data-cycle-photo>
+      <HeroPlate src={heroPhoto.src} focus="50% 6%" focusMobile="86% 0%" scanlines={false} ratio={heroPhoto.width / heroPhoto.height}>
+        {
+          next && (
+            <>
+              <!-- Phones see only the right firefighter: one box on the mask, tag to its left; the countdown lives in the strip below -->
+              <div class="track track-flip sm:hidden" style="left:68%;top:8%;width:17%;height:27%;--i:0">
+                <p class="track-tag">
+                  <span>[{next.title}]</span>
+                  <span>[{formatNumeric(next.start, lang)}]</span>
+                </p>
+              </div>
+              <div class="track track-low hidden sm:block" style="left:24%;top:3%;width:14%;height:27%;--i:0">
+                <p class="track-tag">
+                  <span>[{next.title}]</span>
+                  <span>[{formatNumeric(next.start, lang)} {formatTime(next.start)}]</span>
+                </p>
+                {next.start && <p class="track-time">T-<Countdown target={next.start} labels={ui.countdown[lang]} compact /></p>}
+              </div>
+              {gearList && (
+                <div class="track track-flip track-hot hidden sm:block" style="left:70%;top:36%;width:28%;height:34%;--i:1">
+                  <p class="track-tag">
+                    <span>[Dress code]</span>
+                    {gearLines.map((l) => <span>[{l}]</span>)}
+                  </p>
+                </div>
+              )}
+            </>
+          )
+        }
+      </HeroPlate>
+      <span class="hp-heat" aria-hidden="true"></span>
+      </div>
+      {
+        next && opsMap && (
+          <>
+            <!-- Ops map of the venue: the squad closes in on the real address and locks it -->
+            <HeroOpsMap lang={lang} location={opsMap.location} target={next.start!} countdownLabels={ui.countdown[lang]} lock={opsMap.lock} squad={opsMap.squad} />
+            <HeroCycle
+              pauseLabel={ui.pause[lang]}
+              playLabel={ui.play[lang]}
+              peekLabel={t({ cs: "Klikni pro mapu místa", en: "Click for the venue map" })}
+            />
+          </>
+        )
+      }
+      <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink via-ink/35 to-transparent"></div>
+      {
+        next?.start && (
+          <>
+            <span class="display outline-num still pointer-events-none absolute top-[0.32em] left-4 hidden text-[clamp(6rem,9vw,12rem)] whitespace-nowrap sm:left-8 !leading-[0.8] select-none md:block" aria-hidden="true" data-cycle-a>
+              <span class="title-in block" style="--i:2">{formatNumeric(next.start, lang).slice(0, 5)}</span>
+              {/* When it runs, under the date, set like the GPS line under the district */}
+              <span class="title-in mono mt-[0.35rem] flex gap-4 pl-[calc(0.075*clamp(6rem,9vw,12rem))] text-[0.8rem] tracking-[0.12em] text-acid [-webkit-text-stroke:0]" style="--i:3">
+                <span>{t({ cs: "Start", en: "Start" })} {formatTime(next.start)}</span>
+                {next.end && <span>{t({ cs: "Konec", en: "End" })} {formatTime(next.end)}</span>}
+              </span>
+            </span>
+            {/* On the map the date gives way to the district in the same spot, so the swap never jumps sideways */}
+            {opsMap && (
+              <span class="display outline-num still pointer-events-none absolute top-[0.32em] left-4 hidden text-[clamp(6rem,9vw,12rem)] whitespace-nowrap sm:left-8 !leading-[0.8] select-none md:block" aria-hidden="true" data-cycle-b>
+                {opsMap.place}
+                {/* GPS of the venue under the district, plain mono, not outlined; indented by the side bearing of the display face so it lines up with the L */}
+                <span class="mono mt-[0.35rem] flex gap-4 pl-[calc(0.075*clamp(6rem,9vw,12rem))] text-[0.8rem] tracking-[0.12em] text-acid [-webkit-text-stroke:0]">
+                  <span>{opsMap.location.coords[1].toFixed(5)}° N</span>
+                  <span>{opsMap.location.coords[0].toFixed(5)}° E</span>
+                </span>
+              </span>
+            )}
+          </>
+        )
+      }
+
+      <div class="relative px-4 pb-10 sm:px-8">
+        {next && <p class="title-in display text-[clamp(3rem,8vw,7rem)] !leading-[0.9]" style="--i:1">{next.title}</p>}
+        <div class="hero-in">
+        <p class="mt-5 max-w-[44ch] text-lg leading-relaxed text-bone/90 sm:text-xl" style="--i:3">
+          {t({ cs: "Gear a fetiš noci pro všechny gendery v Praze. Čtyři edice ročně, vybrané techno, přísný dress code.", en: "All gender gear and fetish nights in Prague. Four editions a year, curated techno, strict dress code." })}
+        </p>
+        <div class="mt-7 flex flex-wrap gap-3" style="--i:4">
+          {next && <a href={href(lang, `/events/${next.slug}`)} class="btn btn-acid">{ui.tickets[lang]} <Icon name="arrow-right" /></a>}
+          <a href={href(lang, "/events")} class="btn btn-ghost bg-ink/75">{ui.allEvents[lang]}</a>
+        </div>
+        </div>
+      </div>
+      {
+        next && (
+          <div class="hero-in relative grid items-center gap-x-8 gap-y-1 bg-acid px-4 py-3 text-ink sm:px-8 xl:grid-cols-[auto_1fr_auto]">
+            <p class="display text-xl sm:text-3xl" style="--i:5">{t({ cs: "Příště", en: "Next up" })}: {next.edition[lang]}</p>
+            <p class="mono flex flex-wrap gap-x-4 text-xs sm:text-sm" style="--i:6">
+              <span>{formatNumeric(next.start, lang)}</span>
+              <span>{formatTime(next.start)}</span>
+              <span>{next.venue[lang]}</span>
+            </p>
+            {next.start && <p class="text-sm sm:text-base" style="--i:7"><Countdown target={next.start} labels={ui.countdown[lang]} compact /></p>}
+          </div>
+        )
+      }
+    </div>
+
+    <aside class="relative order-1 flex items-center justify-center overflow-hidden border-line bg-ink px-4 py-5 sm:py-10 lg:order-2 lg:border-l lg:py-14">
+      {next?.start && (
+        <div class="absolute inset-y-0 left-0 hidden lg:block">
+        <HudRail
+          class="h-full !py-14"
+          variant={0}
+          still
+          numbers={[formatNumeric(next.start, lang).slice(0, 2), formatNumeric(next.start, lang).slice(3, 5)]}
+          lines={[`${site.name} / ${site.city[lang]}`, lang === "cs" ? `„${site.tagline[lang]}“` : `“${site.tagline[lang]}”`]}
+        />
+        </div>
+      )}
+      <div class="hidden text-acid lg:block" aria-hidden="true">
+        <Icon name="plus" class="absolute top-4 left-1/2 size-5 -translate-x-1/2" />
+        <Icon name="plus" class="absolute bottom-4 left-1/2 size-5 -translate-x-1/2" />
+      </div>
+      <!-- Stacked on mobile; two vertical columns on desktop (flex-col runs horizontally in vertical writing mode) -->
+      <h1 class="display flex w-full flex-col text-[9vw] !leading-[0.9] text-acid sm:text-[10.5vw] lg:w-auto lg:rail lg:text-[min(6rem,9.5dvh)] lg:!leading-[0.84]" aria-label={site.name}>
+        {
+          ["Gearhead", "Society"].map((word, w) => (
+            <span class:list={[w && "text-bone"]} aria-hidden="true">{word}</span>
+          ))
+        }
+      </h1>
+    </aside>
+  </section>
+
+  <!-- UPCOMING -->
+  <section class="mx-auto max-w-[1400px] px-4 py-24 sm:px-6">
+    <SectionHeading title={t({ cs: "Nadcházející akce", en: "Upcoming events" })} href={href(lang, "/events")} linkLabel={ui.allEvents[lang]} />
+    <div class="grid gap-x-5 gap-y-12 sm:grid-cols-2 lg:grid-cols-4">
+      {upcoming.map((e, i) => <EventCard event={e} lang={lang} index={i} />)}
+    </div>
+  </section>
+
+  <!-- ON THE NIGHT: violet side rail + tagged tiles -->
+  <section class="mx-auto flex max-w-[1400px] flex-col px-4 sm:px-6 md:flex-row">
+    <div class="flex items-center bg-violet px-4 py-3 text-bone md:w-15 md:justify-center md:px-0 md:py-8">
+      <p class="display text-xl text-acid md:rail md:text-3xl" aria-hidden="true">{t({ cs: "Během noci", en: "On the night" })}</p>
+    </div>
+    <div class="min-w-0 flex-1 py-12 md:pl-8">
+      <div class="mb-8 max-w-3xl">
+        <h2 class="display text-3xl sm:text-4xl">{t({ cs: "Během noci", en: "On the night" })}</h2>
+        <p class="mt-4 max-w-[60ch] leading-relaxed text-bone/75">
+          {t({ cs: "Všechno, co potřebuješ, od vstupu až do rána. Ukaž gear, najdi svůj parket a dej si pauzu, když ji potřebuješ.", en: "Everything you need from the door to sunrise. Show your gear, find your floor, take a break when you need one." })}
+        </p>
+      </div>
+      <div class="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 lg:grid lg:grid-cols-4 lg:overflow-visible">
+        {
+          nightTiles.map((tile, i) => (
+            <div class="w-[72vw] shrink-0 snap-start sm:w-80 lg:w-auto">
+              <Visual src={tile.photo} alt="" tone={i === 0 ? "violet" : "mono"} fx={["grain"]} imgClass="settle" class="aspect-square">
+                <span class="chip absolute top-0 left-0"><Icon name={tile.icon} class="size-3.5" /> {tile.tag}</span>
+              </Visual>
+              <div class:list={["flex items-center justify-between gap-3 px-4 py-4", i === 0 ? "bg-violet text-bone" : "bg-steel"]}>
+                <div>
+                  <h3 class="mono text-sm">{tile.title}</h3>
+                  <p class:list={["mt-1 text-xs", i === 0 ? "text-bone/80" : "text-mute"]}>{tile.text}</p>
+                </div>
+                <Icon name="plus" class="size-5 shrink-0" />
+              </div>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- STATEMENT -->
+  <section class="relative mx-auto max-w-[1400px] px-4 py-24 sm:px-6 lg:pl-24">
+    <ContentRail label={t({ cs: "Víc než party", en: "More than a party" })} />
+    <h2 class="display text-[clamp(2.75rem,8.5vw,6rem)]">{t({ cs: "Víc než party. Komunita.", en: "More than a party. A society." })}</h2>
+    <div class="mt-16 grid gap-12 lg:grid-cols-2">
+      <div>
+        <p class="max-w-[52ch] text-lg leading-relaxed text-bone/80">
+          {t({ cs: "Gearhead Society vzniklo z jednoduchého nápadu: noc, kde se gear kultura cítí jako doma. Žádné odsuzování, žádné pózy. Skvělá hudba, syrové prostory a lidé, kteří na sebe dávají pozor.", en: "Gearhead Society started with a simple idea: a night where gear culture feels at home. No judgement, no posing. Great music, raw venues and people who look out for each other." })}
+        </p>
+        <dl class="mt-10 space-y-6">
+          {
+            values.map((v) => (
+              <div>
+                <dt class="mono text-sm text-acid">{v.title}</dt>
+                <dd class="mt-1 max-w-[42ch] text-sm text-mute">{v.text}</dd>
+              </div>
+            ))
+          }
+        </dl>
+        <a href={href(lang, "/about")} class="btn btn-slab mt-10">{t({ cs: "Náš příběh", en: "Our story" })} <Icon name="arrow-right" /></a>
+      </div>
+      <div class="frame frame-on self-start">
+        <Visual src={ph("harness")} alt={t({ cs: "Horolezecký postroj s karabinami na maskáčích", en: "A climbing harness with carabiners over camo" })} tone="mono" fx={["dots"]} imgClass="parallax" class="aspect-[16/11]" />
+      </div>
+    </div>
+  </section>
+
+  <!-- NEXT EDITION READOUT -->
+  {
+    next && (
+      <section>
+        <div class="mx-auto max-w-[1400px] px-4 sm:px-6">
+          <ScanField seed={next.seed + 5} labels={[]} {...scanCopy} label={t({ cs: "Animovaná mapa: trasa noci od vstupu po chill zónu", en: "Animated map: the night's route from the door to the chill zone" })} class="h-[46dvh] min-h-80">
+            <MissionLayer slot="world" route={route} times={[formatTime(next.start), "", "", "", next.end ? formatTime(next.end) : ""]} />
+            <MissionLog
+              heading={t({ cs: "Hlášení z mise", en: "Mission report" })}
+              title={next.title}
+              date={formatNumeric(next.start, lang)}
+              venue={next.venue[lang]}
+              hours={next.end ? `${formatTime(next.start)}-${formatTime(next.end)}` : undefined}
+              route={route}
+              statusLabel={t({ cs: "Stav jednotek", en: "Unit status" })}
+            />
+          </ScanField>
+        </div>
+        <div class="mx-auto grid max-w-[1400px] gap-12 px-4 py-14 sm:px-6 lg:grid-cols-[1fr_1.4fr]">
+          <div>
+            <h2 class="display text-4xl sm:text-5xl">{next.title}</h2>
+            <p class="mono mt-3 text-sm text-acid">{next.edition[lang]}</p>
+            <p class="mt-5 max-w-[46ch] leading-relaxed text-bone/80">{next.summary[lang]}</p>
+            <div class="mt-8">
+              <Countdown target={next.start!} labels={ui.countdown[lang]} stamp={`${formatNumeric(next.start, lang)} ${formatTime(next.start)}`} />
+            </div>
+            <a href={href(lang, `/events/${next.slug}`)} class="tix relative mt-8 inline-flex items-center gap-6 bg-violet px-5 py-3" style={`--dr:${dissolve(19, false)}`}>
+              <span class="grid gap-1.5">
+                <span class="display text-xs text-acid">{formatNumeric(next.start, lang)}, {next.city[lang]}</span>
+                <span class="tix-box display bg-acid px-2 pt-1 pb-0.5 text-2xl leading-none text-violet sm:text-3xl">{ui.eventInfo[lang]}</span>
+              </span>
+              <Icon name="arrow-right" class="tix-arrow-r tix-arrow size-6 text-acid" />
+            </a>
+          </div>
+          <dl class="boot-in mono grid grid-cols-2 content-start gap-x-6 gap-y-6 text-xs sm:grid-cols-3">
+            {
+              readout.map(([k, v], i) => (
+                <div style={`--i:${i}`}>
+                  <dt class="text-mute">{k}</dt>
+                  <dd class="mt-1 text-bone">{v}</dd>
+                </div>
+              ))
+            }
+          </dl>
+        </div>
+      </section>
+    )
+  }
+
+  <!-- GALLERIES -->
+  <section class="py-24">
+    <div class="mx-auto max-w-[1400px] px-4 sm:px-6">
+      <SectionHeading title={t({ cs: "Nejnovější galerie", en: "Latest galleries" })} href={href(lang, "/galleries")} linkLabel={ui.viewAll[lang]} />
+    </div>
+    <div class="mx-auto grid max-w-[1400px] grid-cols-2 gap-4 px-4 pt-2 sm:px-6 lg:grid-cols-4">
+      {latest.map((g, i) => <GalleryCard gallery={g} lang={lang} index={i} />)}
+    </div>
+  </section>
+
+  <!-- COMMUNITY: violet plate in the content column, grey panel docks in from the right -->
+  <section class="mx-auto max-w-[1400px] px-4 pb-24 sm:px-6">
+    <div class="relative flex min-h-[70dvh] items-end justify-end overflow-hidden">
+      <Visual src={ph("mx-pack")} alt="" tone="violet" fx={["lines"]} imgClass="parallax" class="!absolute inset-0" />
+      <div class="slide-in relative w-full bg-panel p-6 text-ink sm:p-8 lg:max-w-xl">
+        <h2 class="display text-4xl sm:text-5xl">{t({ cs: "Dozvíš se to první", en: "First to know" })}</h2>
+        <p class="mt-4 max-w-[44ch] leading-relaxed">
+          {t({ cs: "Early bird vstupenky, lineupy a nové fotky jdou na náš Discord dřív než kamkoli jinam.", en: "Early bird tickets, lineups and photo drops go to our Discord server before anywhere else." })}
+        </p>
+        <div class="mt-7 flex flex-wrap gap-3">
+          {
+            site.socials.map((s) => (
+              <a href={s.href} target="_blank" rel="noopener" class:list={["btn", s.label === "Discord" ? "bg-ink text-acid hover:bg-steel" : "border border-ink/40 hover:bg-ink hover:text-bone"]}>
+                {s.label} <Icon name="arrow-up-right" />
+              </a>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+  </section>
+</Layout>

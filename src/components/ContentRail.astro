@@ -1,0 +1,35 @@
+---
+/**
+ * HUD strip beside the page content: sticks under the header while the section scrolls.
+ * Place it inside a `relative` section that leaves room on the left (`lg:pl-24`).
+ * Numerals and lines are real data; defaults to the next event's day and month and the city.
+ */
+import HudRail from "./HudRail.astro";
+import { formatNumeric, nextEvent } from "../data/events";
+import { hudVariant } from "../data/hud";
+import { site } from "../data/site";
+import type { Lang } from "../i18n";
+
+interface Props {
+  /** Section or page name for the first vertical line */
+  label: string;
+  numbers?: [string, string];
+  lines?: string[];
+  variant?: number;
+}
+const lang = (Astro.params.lang ?? "cs") as Lang;
+const next = nextEvent();
+const date = next?.start ? formatNumeric(next.start, lang) : "";
+const { label, numbers = date ? ([date.slice(0, 2), date.slice(3, 5)] as [string, string]) : undefined, variant = hudVariant(Astro.url.pathname, 2) } = Astro.props;
+const lines = Astro.props.lines ?? [label, `${site.name} / ${site.city[lang]}`];
+---
+
+{
+  numbers && (
+    <div class="pointer-events-none absolute top-16 bottom-16 left-4 hidden text-acid sm:left-6 lg:block">
+      <div class="sticky top-24 h-[min(34rem,calc(100dvh-8rem))] overflow-hidden">
+        <HudRail class="h-full !py-2" numbers={numbers} lines={lines} variant={variant} />
+      </div>
+    </div>
+  )
+}

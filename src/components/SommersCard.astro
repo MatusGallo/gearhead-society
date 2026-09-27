@@ -1,0 +1,32 @@
+---
+import Icon from "./Icon.astro";
+import SommersPoster from "./SommersPoster.astro";
+import type { SommersEdition } from "../data/sommers";
+import { href, type Lang } from "../i18n";
+
+interface Props {
+  edition: SommersEdition;
+  lang: Lang;
+  past?: boolean;
+}
+const { edition: e, lang, past = false } = Astro.props;
+const cta = past ? { cs: "Jak to bylo", en: "How it went" } : { cs: "Info a registrace", en: "Info and registration" };
+---
+
+<!-- The poster already carries title, date and place; the body adds only what it lacks -->
+<a href={href(lang, `/sommers/${e.slug}`)} class="group block">
+  <div class="frame">
+    <div class="overflow-hidden">
+      <SommersPoster edition={e} lang={lang} class="transition-transform duration-700 ease-(--ease-out-expo) group-hover:scale-[1.03]" />
+    </div>
+    <div class="bg-steel px-4 py-4">
+      <p class="text-sm leading-relaxed text-bone/80">{e.summary[lang]}</p>
+      <div class="mt-4 flex items-center justify-between gap-4">
+        <span class="mono inline-flex items-center gap-2 text-xs transition-colors group-hover:text-acid">
+          {cta[lang]} <Icon name="arrow-right" class="size-3.5 transition-transform group-hover:translate-x-1" />
+        </span>
+        {e.price && !past && <span class="mono text-sm text-acid">{e.price[lang]}</span>}
+      </div>
+    </div>
+  </div>
+</a>

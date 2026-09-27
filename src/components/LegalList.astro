@@ -1,0 +1,26 @@
+---
+/** Numbered legal sections (privacy, terms): number, heading, paragraphs, hairlines between. */
+import type { L, Lang } from "../i18n";
+
+interface Props {
+  lang: Lang;
+  sections: [L, L<string[]>][];
+}
+const { lang, sections } = Astro.props;
+---
+
+<ol class="border-t border-line">
+  {
+    sections.map(([title, body], i) => (
+      <li class="grid gap-4 border-b border-line py-10 sm:grid-cols-[3rem_1fr]">
+        <span class="mono text-acid">{String(i + 1).padStart(2, "0")}</span>
+        <div>
+          <h2 class="display text-2xl">{title[lang]}</h2>
+          <div class="mt-4 space-y-4 leading-relaxed text-bone/75">
+            {body[lang].map((p) => <p>{p}</p>)}
+          </div>
+        </div>
+      </li>
+    ))
+  }
+</ol>

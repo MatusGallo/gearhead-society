@@ -1,0 +1,102 @@
+---
+/**
+ * Map phase of the home hero (HeroCycle): the real venue map (MapLibre, same style as
+ * VenueMap) under the ops overlay. Each time the hero cuts to the map, the camera opens over
+ * the city and dives onto the venue while the squad closes in; they arrive together and the
+ * venue locks. The map bundle loads in the background a few seconds after the hero is on
+ * screen, never on page load. Every readout is real venue or event data.
+ */
+import OpsLayer from "./OpsLayer.astro";
+import type { EventLocation } from "../data/events";
+
+interface Props {
+  lang: string;
+  location: EventLocation;
+  target: string;
+  countdownLabels: [string, string, string, string];
+  lock: string[];
+  squad: string[];
+}
+const { lang, location: loc, target, countdownLabels, lock, squad } = Astro.props;
+---
+
+<div class="hom absolute inset-0 overflow-hidden bg-ink" data-cycle-map data-hom data-lang={lang} data-coords={JSON.stringify(loc.coords)}>
+  <div class="hom-canvas !absolute inset-0" data-hom-canvas></div>
+  <div class="hom-hud absolute inset-0" aria-hidden="true"></div>
+  <!-- The lock of the overlay sits at 63.5% / 25%; shift the layer so it lands on the venue, which the map holds at 50% / 40% -->
+  <div class="hom-ops absolute inset-0">
+    <OpsLayer run="cue" flat target={target} countdownLabels={countdownLabels} lock={lock} squad={squad} />
+  </div>
+</div>
+
+<style>
+  .hom {
+    container-type: size;
+  }
+  .hom-canvas {
+    opacity: 0;
+    transition: opacity 0.6s linear;
+  }
+  .hom-canvas[data-ready] {
+    opacity: 1;
+  }
+  /* MapLibre's own canvas; keep it off the pointer and the tab order */
+  .hom-canvas :global(canvas) {
+    outline: none;
+  }
+  /* Static feed texture: a fine grid and a vignette toward the target */
+  .hom-hud {
+    z-index: 1;
+    pointer-events: none;
+    background:
+      linear-gradient(rgb(192 254 4 / 0.05) 1px, transparent 1px) 50% 50% / 48px 48px,
+      linear-gradient(90deg, rgb(192 254 4 / 0.05) 1px, transparent 1px) 50% 50% / 48px 48px,
+      radial-gradient(ellipse at 50% 50%, transparent 40%, rgb(7 7 7 / 0.8) 100%);
+  }
+  .hom-ops {
+    z-index: 2;
+    translate: -13.5% 15%;
+  }
+  /* Phones: the headline starts higher, so the venue (and the map centre) sit at 30% */
+  @media (max-width: 639px) {
+    .hom-ops { translate: -13.5% 5%; }
+  }
+</style>
+
+<script>
+  document.querySelectorAll<HTMLElement>("[data-hom]").forEach((root) => {
+    const hero = root.closest<HTMLElement>("[data-cycle]");
+    if (!hero || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const canvas = root.querySelector<HTMLElement>("[data-hom-canvas]")!;
+    const venue: [number, number] = JSON.parse(root.dataset.coords!);
+    let ops: { approach: (d: number, onLand: () => void) => void; peek: () => void; stop: () => void } | undefined;
+    hero.setAttribute("data-ops-late", "");
+    let loading: Promise<void> | undefined;
+
+    const load = () =>
+      (loading ??= import("../scripts/venue-map").then(
+        // Parse the bundle and build the map in separate idle slots, so neither lands as one long frame
+        ({ mountOpsMap }) =>
+          new Promise<void>((done) => {
+            const mount = () => {
+              ops = mountOpsMap({ container: canvas, venue, lang: root.dataset.lang!, onReady: () => hero.setAttribute("data-map-ready", "") });
+              done();
+            };
+            "requestIdleCallback" in window ? requestIdleCallback(mount, { timeout: 1500 }) : setTimeout(mount, 200);
+          }),
+      ));
+
+    // First the map: the camera dives onto the venue with its structures rising; only once it
+    // has landed do the teams set off (OpsLayer cue, [data-ops-run]) and close in on the lock
+    const cue = () => {
+      if (hero.getAttribute("data-view") !== "map") return;
+      hero.removeAttribute("data-ops-run");
+      void hero.offsetWidth;
+      hero.setAttribute("data-ops-run", "");
+    };
+    hero.addEventListener("cycle:prepare", () => void load());
+    hero.addEventListener("cycle:peek", () => void load().then(() => ops?.peek()));
+    hero.addEventListener("cycle:map", () => void load().then(() => ops?.approach(5000, cue)));
+    hero.addEventListener("cycle:pause", (e) => (e as CustomEvent).detail && ops?.stop());
+  });
+</script>

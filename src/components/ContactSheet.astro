@@ -1,0 +1,101 @@
+---
+/**
+ * Galleries hero: the page title beside one large film frame of the latest gallery with photos
+ * (sprocket holes, edge code with title, date and photo count), tinted in the gallery's own hue
+ * like a colour print; hover clears it to the acid duotone. It develops in on load (.develop).
+ * The shot skips the covers the cards below use, so no photo repeats on the page.
+ */
+import Icon from "./Icon.astro";
+import Visual from "./Visual.astro";
+import { galleryCover, galleryPhotos, type Gallery } from "../data/galleries";
+import { formatNumeric } from "../data/events";
+import { href, translator, ui, type Lang } from "../i18n";
+
+interface Props {
+  galleries: Gallery[];
+  lang: Lang;
+  title: string;
+  lead: string;
+}
+const { galleries, lang, title, lead } = Astro.props;
+const t = translator(lang);
+
+// Newest first; a shoot still waiting for its photos is skipped
+const latest = galleries.find((g) => galleryPhotos(g).length);
+const photos = latest ? galleryPhotos(latest) : [];
+const covers = new Set(galleries.map((g) => galleryCover(g)));
+const shot = photos.find((p) => !covers.has(p.src)) ?? photos[0];
+const count = lang === "cs" ? `${photos.length} ${photos.length === 1 ? "fotka" : photos.length < 5 ? "fotky" : "fotek"}` : `${photos.length} ${photos.length === 1 ? "photo" : "photos"}`;
+const link = latest && href(lang, `/galleries/${latest.slug}`);
+---
+
+<section class="relative overflow-hidden pt-15">
+  <div class="relative mx-auto grid max-w-[1400px] items-end gap-12 px-4 pt-16 pb-16 sm:px-6 sm:pt-20 lg:grid-cols-[0.8fr_1.2fr]">
+    <div class="min-w-0">
+      <h1 class="title-in display text-[clamp(2.75rem,8vw,6rem)]">{title}</h1>
+      {
+        latest && (
+          <div class="hero-in mt-8 border-y border-line py-5" style={`--h:${latest.hue}`}>
+            <p class="mono flex items-center gap-2 text-xs text-mute" style="--i:2">
+              <span class="hue-dot size-1.5" aria-hidden="true" />
+              {t({ cs: "Nejnovější", en: "Latest" })} / {formatNumeric(latest.date, lang)} / {ui.galleryKind[latest.kind][lang]}
+            </p>
+            <p class="display mt-3 text-[clamp(1.75rem,3.5vw,2.75rem)] !leading-none" style="--i:3">{latest.title}</p>
+            <a href={link} class="btn btn-acid mt-6" style="--i:4">
+              {t({ cs: "Otevřít galerii", en: "Open gallery" })} <span class="mono text-xs opacity-70">{count}</span> <Icon name="arrow-right" />
+            </a>
+          </div>
+        )
+      }
+      <p class="title-in mt-7 flex max-w-[48ch] gap-3 leading-relaxed text-bone/75" style="--i:5">
+        <Icon name="shield-check" class="mt-1 size-5 shrink-0 text-acid" />
+        <span>{lead}</span>
+      </p>
+    </div>
+
+    {
+      latest && (
+        <a href={link} class="strip develop group block min-w-0 bg-coal px-3 py-6 sm:px-4" style={`--h:${latest.hue}`}>
+          <span class="relative block">
+            <Visual src={shot.src} alt={latest.title} hue={latest.hue} tone="mono" hover="tone" fx={["grain"]} class="aspect-[3/2]" loading="eager" />
+            <span class="tint pointer-events-none absolute inset-0" aria-hidden="true" />
+          </span>
+          <span class="mono mt-3 flex items-center justify-between gap-4 text-[11px] leading-tight">
+            <span class="flex min-w-0 items-center gap-2">
+              <span class="text-acid">01A</span>
+              <span class="truncate text-bone/80 group-hover:text-acid">{latest.title}</span>
+            </span>
+            <span class="shrink-0 text-mute">{formatNumeric(latest.date, lang)} / {count}</span>
+          </span>
+        </a>
+      )
+    }
+  </div>
+</section>
+
+<style>
+  /* Film strip: sprocket holes along both edges */
+  .strip {
+    --hole: color-mix(in oklab, var(--color-bone) 14%, transparent);
+    background-image:
+      repeating-linear-gradient(to right, var(--hole) 0 8px, transparent 8px 20px),
+      repeating-linear-gradient(to right, var(--hole) 0 8px, transparent 8px 20px);
+    background-size: 100% 6px;
+    background-position: 0 6px, 0 calc(100% - 6px);
+    background-repeat: no-repeat;
+  }
+  /* Colour print: the gallery hue laid over the greyscale plate, gone on hover */
+  .tint {
+    background: hsl(var(--h) 85% 55%);
+    mix-blend-mode: color;
+    opacity: 0.75;
+    transition: opacity 0.4s var(--ease-out-expo);
+  }
+  .group:hover .tint,
+  .group:focus-visible .tint {
+    opacity: 0;
+  }
+  .hue-dot {
+    background: hsl(var(--h) 85% 60%);
+  }
+</style>
