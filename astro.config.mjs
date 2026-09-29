@@ -37,6 +37,8 @@ export default defineConfig({
   devToolbar: { enabled: false },
   integrations: [sitemap()],
   vite: {
-    plugins: [tailwindcss()]
+    plugins: [tailwindcss()],
+    // MapLibre (~1 MB) is its own chunk, imported only when a map mounts; it cannot split further
+    build: { chunkSizeWarningLimit: 1100 },
   }
 });

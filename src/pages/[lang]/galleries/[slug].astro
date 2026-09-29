@@ -6,12 +6,12 @@ import Lightbox, { type LightboxItem } from "../../../components/Lightbox.astro"
 import PageHero from "../../../components/PageHero.astro";
 import ContentRail from "../../../components/ContentRail.astro";
 import Visual from "../../../components/Visual.astro";
-import { galleries, galleryCover, galleryPhotos, sommersGalleries, type Gallery } from "../../../data/galleries";
+import { galleries, galleryCover, galleryPhotos, type Gallery } from "../../../data/galleries";
 import { site } from "../../../data/site";
 import { href, langs, locale, translator, ui, type Lang } from "../../../i18n";
 
 export function getStaticPaths() {
-  return langs.flatMap((lang) => [...galleries, ...sommersGalleries].map((gallery) => ({ params: { lang, slug: gallery.slug }, props: { gallery } })));
+  return langs.flatMap((lang) => galleries.map((gallery) => ({ params: { lang, slug: gallery.slug }, props: { gallery } })));
 }
 
 const lang = Astro.params.lang as Lang;
@@ -31,7 +31,7 @@ const tiles = await Promise.all(
     const item: LightboxItem = {
       full: full.src,
       download: photo.src,
-      name: `${gallery.sommers ? "" : "gearhead-"}${gallery.slug}-${n}.${photo.format}`,
+      name: `gearhead-${gallery.slug}-${n}.${photo.format}`,
       w: photo.width,
       h: photo.height,
       alt: `${gallery.title}, ${t({ cs: "fotka", en: "photo" })} ${i + 1}`,
@@ -47,10 +47,10 @@ const pending = 8;
 const discord = site.socials.find((s) => s.label === "Discord")!.href;
 ---
 
-<Layout lang={lang} theme={gallery.sommers ? "sommers" : undefined} title={`${gallery.title}, ${kind}`}>
+<Layout lang={lang} title={`${gallery.title}, ${kind}`}>
   <PageHero title={gallery.title} lead={`${kind}, ${date}`}>
-    <a href={href(lang, gallery.sommers ? `/sommers/${gallery.sommers}` : "/galleries")} class="mt-8 inline-flex min-h-11 items-center gap-2 text-sm text-mute hover:text-acid">
-      <Icon name="arrow-left" /> {gallery.sommers ? t({ cs: "Zpět na sraz", en: "Back to the meetup" }) : t({ cs: "Všechny galerie", en: "All galleries" })}
+    <a href={href(lang, "/galleries")} class="mt-8 inline-flex min-h-11 items-center gap-2 text-sm text-mute hover:text-acid">
+      <Icon name="arrow-left" /> {t({ cs: "Všechny galerie", en: "All galleries" })}
     </a>
   </PageHero>
 
@@ -95,7 +95,7 @@ const discord = site.socials.find((s) => s.label === "Discord")!.href;
                     alt=""
                     loading={i < 8 ? "eager" : "lazy"}
                     decoding="async"
-                    class="absolute inset-0 size-full object-cover transition-transform duration-700 ease-(--ease-out-expo) group-hover:scale-[1.04]"
+                    class="absolute inset-0 size-full object-cover transition-transform duration-500 ease-(--ease-out-expo) motion-safe:group-hover:scale-[1.04]"
                   />
                   <span class="chip absolute top-0 right-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
                     <Icon name="arrows-out" class="size-3.5" />

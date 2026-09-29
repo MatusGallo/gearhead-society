@@ -1,5 +1,6 @@
 import type { L } from "../i18n";
 import { site } from "./site";
+import { sommers } from "./sommers";
 
 /**
  * Everything the site stores in the browser or loads from third parties, shown on /cookies and summarised in the
@@ -58,5 +59,21 @@ export const stored: StoredItem[] = [
     },
     expiry: { cs: "Neukládá se", en: "Not stored" },
   },
+  // Listed once the Sommers podcast is live; the player loads only after a click on it
+  ...(!sommers.podcast.demo && sommers.podcast.episodes.some((e) => e.url)
+    ? [
+        {
+          name: "open.spotify.com",
+          category: "necessary",
+          provider: "Spotify",
+          kind: { cs: "Vložený přehrávač, cookies třetí strany", en: "Embedded player, third-party cookies" },
+          purpose: {
+            cs: "Přehrávač podcastu na stránce Sommers. Načte se, až když na něj klikneš; Spotify pak ukládá vlastní cookies podle svých zásad.",
+            en: "The podcast player on the Sommers page. It loads only when you click it; Spotify then sets its own cookies under its own policy.",
+          },
+          expiry: { cs: "Podle Spotify", en: "Set by Spotify" },
+        } satisfies StoredItem,
+      ]
+    : []),
   // TODO: add the analytics tool's cookies here (category "analytics") once `site.analytics.src` is set
 ];

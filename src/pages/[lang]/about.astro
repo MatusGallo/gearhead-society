@@ -3,7 +3,7 @@ import Layout from "../../layouts/Layout.astro";
 import Icon from "../../components/Icon.astro";
 import ContentRail from "../../components/ContentRail.astro";
 import Visual from "../../components/Visual.astro";
-import { events, formatNumeric, nextEvent } from "../../data/events";
+import { events, formatNumeric, isWaitlist, nextEvent } from "../../data/events";
 import { ph } from "../../data/placeholder";
 import { site } from "../../data/site";
 import { href, langPaths, locale, translator, ui, type Lang } from "../../i18n";
@@ -46,13 +46,14 @@ const manifesto = [
 ];
 
 // The season on a 12-month ruler, from the real editions. An edition without a date sits in its
-// season (Summer Grease: July and August) and says the date is still to be announced.
+// season (Summer Grease: July and August) and says the date is still to be announced; one not announced yet keeps its
+// month on the ruler but shows the waiting list instead of the date.
 const months = [...Array(12).keys()].map((m) => new Date(2026, m, 15).toLocaleDateString(locale[lang], { month: "short" }).replace(".", ""));
 const summer = [6, 7];
 const season = events
   .map((e) => {
     const m = e.start ? Number(e.start.slice(5, 7)) - 1 : summer[0];
-    return { e, from: m, span: e.start ? 1 : summer.length, when: e.start ? formatNumeric(e.start, lang) : ui.dateTba[lang] };
+    return { e, from: m, span: e.start ? 1 : summer.length, when: isWaitlist(e) ? "Waiting list" : e.start ? formatNumeric(e.start, lang) : ui.dateTba[lang] };
   })
   .sort((a, b) => a.from - b.from);
 
@@ -78,7 +79,7 @@ const values = [
             <>{part} </>
           ) : (
             <><span class="ab-chip relative inline-block h-[0.72em] w-[1.8em] align-[-0.02em]" style={`--i:${part}`} aria-hidden="true">
-              <Visual src={chips[part].src} alt="" tone={chips[part].tone} fx={["grain"]} focus={chips[part].focus} loading="eager" class="size-full" />
+              <Visual src={chips[part].src} sizes="240px" alt="" tone={chips[part].tone} fx={["grain"]} focus={chips[part].focus} loading="eager" class="size-full" />
             </span> </>
           ),
         )}
@@ -177,7 +178,7 @@ const values = [
   <section class="mx-auto grid max-w-[1400px] items-stretch gap-10 px-4 py-24 sm:px-6 lg:grid-cols-[0.8fr_1.2fr] lg:pl-24">
     <!-- TODO: placeholder CC0 stock photo -->
     <div class="frame frame-on">
-      <Visual src={ph("harness")} alt="" tone="violet" hover="tone" fx={["dots"]} imgClass="settle" class="aspect-[4/5] h-full lg:aspect-auto" />
+      <Visual src={ph("harness")} sizes="(min-width: 1024px) 40vw, 100vw" alt="" tone="violet" hover="tone" fx={["dots"]} imgClass="settle" class="aspect-[4/5] h-full lg:aspect-auto" />
     </div>
     <div class="slide-in flex flex-col justify-between gap-10 border border-line p-6 sm:p-10">
       <h2 class="display text-[clamp(2rem,4.5vw,3.5rem)] text-balance">{t({ cs: "Na parketu platí tři věci", en: "Three things hold on the floor" })}</h2>

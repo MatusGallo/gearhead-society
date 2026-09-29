@@ -11,6 +11,7 @@ const routes: Record<string, number> = {
   privacy: 1,
   imprint: 2,
   sommers: 3,
+  "id-card": 1,
 };
 
 /** Variant for a page path like /cs/galleries/pressure-2025; detail pages shift by one */

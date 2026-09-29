@@ -24,7 +24,7 @@ const t = translator(lang);
 const latest = galleries.find((g) => galleryPhotos(g).length);
 const photos = latest ? galleryPhotos(latest) : [];
 const covers = new Set(galleries.map((g) => galleryCover(g)));
-const shot = photos.find((p) => !covers.has(p.src)) ?? photos[0];
+const shot = photos.find((p) => !covers.has(p)) ?? photos[0];
 const count = lang === "cs" ? `${photos.length} ${photos.length === 1 ? "fotka" : photos.length < 5 ? "fotky" : "fotek"}` : `${photos.length} ${photos.length === 1 ? "photo" : "photos"}`;
 const link = latest && href(lang, `/galleries/${latest.slug}`);
 ---
@@ -57,7 +57,7 @@ const link = latest && href(lang, `/galleries/${latest.slug}`);
       latest && (
         <a href={link} class="strip develop group block min-w-0 bg-coal px-3 py-6 sm:px-4" style={`--h:${latest.hue}`}>
           <span class="relative block">
-            <Visual src={shot.src} alt={latest.title} hue={latest.hue} tone="mono" hover="tone" fx={["grain"]} class="aspect-[3/2]" loading="eager" />
+            <Visual src={shot} sizes="(min-width: 1024px) 60vw, 100vw" alt={latest.title} hue={latest.hue} tone="mono" hover="tone" fx={["grain"]} class="aspect-[3/2]" loading="eager" />
             <span class="tint pointer-events-none absolute inset-0" aria-hidden="true" />
           </span>
           <span class="mono mt-3 flex items-center justify-between gap-4 text-[11px] leading-tight">
@@ -91,9 +91,12 @@ const link = latest && href(lang, `/galleries/${latest.slug}`);
     opacity: 0.75;
     transition: opacity 0.4s var(--ease-out-expo);
   }
-  .group:hover .tint,
   .group:focus-visible .tint {
     opacity: 0;
+  }
+  /* Real pointers only: a tap on touch would leave the tint stuck off */
+  @media (hover: hover) and (pointer: fine) {
+    .group:hover .tint { opacity: 0; }
   }
   .hue-dot {
     background: hsl(var(--h) 85% 60%);

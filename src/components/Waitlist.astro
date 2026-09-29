@@ -1,0 +1,206 @@
+---
+/**
+ * Waiting list for an upcoming event with no wave on sale: one e-mail field, we write once when the sale opens.
+ * Sends `{ type: "waitlist", event, title, email, lang }` as JSON to `site.waitlist.endpoint` when it is set,
+ * otherwise opens a prefilled e-mail. Without JavaScript the form itself is a mailto form. With `event.waitlist` set,
+ * WaitCount shows how many are on the list. `size="lg"` is the centred hero version: one wide row with the violet
+ * Waiting list block, the field and the button, and the what-happens line folded into the small print.
+ */
+import Icon from "./Icon.astro";
+import WaitCount from "./WaitCount.astro";
+import { site } from "../data/site";
+import type { EventItem } from "../data/events";
+import { href, translator, ui, type Lang } from "../i18n";
+
+interface Props {
+  event: EventItem;
+  lang: Lang;
+  size?: "md" | "lg";
+  class?: string;
+}
+
+const { event, lang, size = "md", class: cls } = Astro.props;
+const lg = size === "lg";
+const t = translator(lang);
+const subject = `${t({ cs: "Waiting list", en: "Waiting list" })}: ${event.title}`;
+const id = `wl-${event.slug}`;
+const what = t({
+  cs: "Termín, místo ani vstupenky zatím neznáme. Napíšeme ti jednou, až je oznámíme. Žádný newsletter.",
+  en: "No date, venue or tickets yet. We write once, when we announce them. No newsletter.",
+});
+
+const copy = {
+  error: t({ cs: "Zkontroluj e-mail, sem ti dáme vědět.", en: "Check the e-mail address, that is where we write." }),
+  failed: t({ cs: `Nepodařilo se to odeslat. Zkus to znovu, nebo napiš na ${site.email}.`, en: `That did not go through. Try again, or write to ${site.email}.` }),
+  body: t({ cs: `Dejte mi vědět, až oznámíte ${event.title}.`, en: `Let me know when you announce ${event.title}.` }),
+  doneTitle: t({ cs: "Jsi na seznamu", en: "You are on the list" }),
+  doneText: t({ cs: "Až akci oznámíme, přijde ti e-mail. Odhlásit se můžeš kdykoli odpovědí na něj.", en: "When we announce it, you get an e-mail. Reply to it any time to be taken off." }),
+  mailTitle: t({ cs: "Odešli e-mail", en: "Send the e-mail" }),
+  mailText: t({ cs: `Otevřeli jsme ti předvyplněný e-mail. Na seznamu budeš, až ho odešleš. Neotevřel se? Napiš na ${site.email}.`, en: `We opened a prefilled e-mail. You are on the list once you send it. Nothing opened? Write to ${site.email}.` }),
+};
+---
+
+<div
+  id="waitlist"
+  class:list={["wl scroll-mt-24", lg && "wl-lg", cls]}
+  data-waitlist
+  data-endpoint={site.waitlist.endpoint}
+  data-email={site.email}
+  data-event={event.slug}
+  data-title={event.title}
+  data-lang={lang}
+  data-subject={subject}
+  data-copy={JSON.stringify(copy)}
+>
+  <form action={`mailto:${site.email}?subject=${encodeURIComponent(subject)}`} method="post" enctype="text/plain" novalidate class:list={{ "frame frame-on": lg }} data-waitlist-form>
+    {
+      !lg && (
+        <>
+          <p class="mono flex items-center gap-2 text-sm text-acid"><Icon name="bell-simple-ringing" class="size-5" /> Waiting list</p>
+          <p class="mt-2 text-sm leading-relaxed text-bone/75">{what}</p>
+        </>
+      )
+    }
+    <label for={id} class:list={lg ? "wl-tag flex items-center justify-between gap-4 bg-violet px-4 py-3 sm:justify-start sm:px-5" : "sr-only"}>
+      {lg ? (
+        <>
+          <span class="display bg-acid px-2 pt-1 pb-0.5 text-xl leading-none whitespace-nowrap text-violet sm:text-2xl">Waiting list</span>
+          <Icon name="bell-simple-ringing" class="size-6 shrink-0 text-acid" />
+          <span class="sr-only">E-mail</span>
+        </>
+      ) : "E-mail"}
+    </label>
+    <div class:list={["flex", lg ? "wl-row" : "mt-4"]}>
+      <input
+        id={id}
+        type="email"
+        name="email"
+        required
+        autocomplete="email"
+        spellcheck="false"
+        placeholder={t({ cs: "tvuj@email.cz", en: "you@email.com" })}
+        class:list={["field min-w-0 flex-1 border-r-0", lg && "min-h-16 border-y-0 border-l-0 bg-ink/90 text-lg"]}
+        aria-describedby={`${id}-error`}
+      />
+      <button type="submit" class:list={["btn btn-acid shrink-0 disabled:cursor-progress disabled:opacity-70", lg ? "min-h-16 !px-5 sm:!px-7" : "!px-4"]} aria-label={t({ cs: "Přidat na waiting list", en: "Join the waiting list" })} data-waitlist-submit>
+        {t({ cs: "Hlídat", en: "Notify me" })} <Icon name="arrow-right" />
+      </button>
+    </div>
+    <span id={`${id}-error`} class="field-error" role="alert" data-waitlist-error></span>
+    <p class:list={["mt-3 text-xs leading-relaxed text-mute", lg && "wl-print mt-5 text-center text-sm"]}>
+      {lg
+        ? t({ cs: "Napíšeme jednou, až akci oznámíme. Žádný newsletter. ", en: "We write once, when we announce it. No newsletter. " })
+        : t({ cs: "E-mail použijeme jen k tomuhle upozornění. ", en: "We use your e-mail for this one notice only. " })}
+      <a href={href(lang, "/privacy")} class="underline underline-offset-4 hover:text-acid">{ui.footer.privacy[lang]}</a>
+    </p>
+  </form>
+
+  <div class:list={["wl-done outline-none", lg && "border border-line bg-ink/90 p-6 text-center [&>p:first-child]:justify-center"]} hidden tabindex="-1" data-waitlist-done>
+    <p class="mono flex items-center gap-2 text-sm text-acid"><Icon name="check-circle" class="size-5" /> <span data-waitlist-title></span></p>
+    <p class="mt-2 text-sm leading-relaxed text-bone/75" data-waitlist-text></p>
+  </div>
+
+  <!-- Outside the form, so it stays in view and takes the visitor's tile once the sign-up is in -->
+  {!!event.waitlist && <WaitCount count={event.waitlist} seed={event.seed} lang={lang} size={size} class={lg ? "mt-10 justify-center" : "mt-5 border-t border-line pt-4"} />}
+</div>
+
+<style>
+  /* Hero row: violet tag, field and button in one frame; the tag stacks on top on phones */
+  .wl-lg form {
+    display: grid;
+  }
+  .wl-lg .wl-tag,
+  .wl-lg .wl-row {
+    border: 1px solid var(--color-line);
+  }
+  .wl-lg .wl-row { border-top: 0; }
+  @media (min-width: 40rem) {
+    .wl-lg form { grid-template-columns: auto minmax(0, 1fr); }
+    .wl-lg .wl-tag { border-right: 0; }
+    .wl-lg .wl-row { border-top: 1px solid var(--color-line); border-left: 0; }
+    .wl-lg .field-error,
+    .wl-lg .wl-print { grid-column: 1 / -1; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    /* The confirmation drops in behind a short acid bar, like the ticket stamp */
+    .wl-done:not([hidden]) { animation: wl-in 0.5s var(--ease-out-expo) both; }
+    .wl-done:not([hidden])::before {
+      content: "";
+      display: block;
+      height: 2px;
+      margin-bottom: 0.9rem;
+      background: var(--color-acid);
+      transform-origin: left;
+      animation: wl-bar 0.6s var(--ease-out-expo) both;
+    }
+  }
+  @keyframes wl-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes wl-bar {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
+  }
+</style>
+
+<script>
+  type Copy = Record<"error" | "failed" | "body" | "doneTitle" | "doneText" | "mailTitle" | "mailText", string>;
+
+  document.querySelectorAll<HTMLElement>("[data-waitlist]").forEach((root) => {
+    const d = root.dataset;
+    const copy = JSON.parse(d.copy!) as Copy;
+    const form = root.querySelector<HTMLFormElement>("[data-waitlist-form]")!;
+    const done = root.querySelector<HTMLElement>("[data-waitlist-done]")!;
+    const input = form.elements.namedItem("email") as HTMLInputElement;
+    const error = root.querySelector<HTMLElement>("[data-waitlist-error]")!;
+    const submit = root.querySelector<HTMLButtonElement>("[data-waitlist-submit]")!;
+    let tried = false;
+
+    const validate = () => {
+      const bad = !input.value.trim() || !input.validity.valid;
+      input.setAttribute("aria-invalid", String(bad));
+      error.textContent = bad ? copy.error : "";
+      return !bad;
+    };
+    input.addEventListener("input", () => tried && validate());
+
+    const finish = (mail: boolean) => {
+      form.hidden = true;
+      done.hidden = false;
+      root.querySelector("[data-waitlist-title]")!.textContent = mail ? copy.mailTitle : copy.doneTitle;
+      root.querySelector("[data-waitlist-text]")!.textContent = mail ? copy.mailText : copy.doneText;
+      done.focus();
+    };
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      tried = true;
+      if (!validate()) return input.focus();
+      const email = input.value.trim();
+
+      if (d.endpoint) {
+        submit.disabled = true;
+        try {
+          const res = await fetch(d.endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify({ type: "waitlist", event: d.event, title: d.title, email, lang: d.lang }),
+          });
+          if (!res.ok) throw new Error(String(res.status));
+          finish(false);
+          // Only a sign-up that reached the list counts; the e-mail fallback is not in until it is sent
+          root.dispatchEvent(new CustomEvent("wl:joined"));
+        } catch {
+          error.textContent = copy.failed;
+        } finally {
+          submit.disabled = false;
+        }
+        return;
+      }
+
+      location.href = `mailto:${d.email}?subject=${encodeURIComponent(d.subject!)}&body=${encodeURIComponent(`${copy.body}\n\nE-mail: ${email}`)}`;
+      finish(true);
+    });
+  });
+</script>

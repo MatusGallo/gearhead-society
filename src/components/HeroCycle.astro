@@ -14,7 +14,9 @@
  *
  * The viewer can also switch: a click on the hero (outside its links and buttons) cuts right
  * away, and the timer starts over. With a fine pointer, hovering the photo
- * opens a peek at the map through a lens that follows the pointer (`--x/--y` from Pointer.astro).
+ * opens a peek at the map through a lens that follows the pointer: the ring rides `--x/--y` from
+ * Pointer.astro, the map layer gets its clip-path straight from the script, so the vars never
+ * restyle the whole map subtree.
  *
  * Events on the hero element for the map layer: `cycle:prepare` (soon after load, or on the
  * first hover; load in the background), `cycle:peek` (lens opens), `cycle:map` / `cycle:photo`
@@ -29,7 +31,7 @@ interface Props {
 const { pauseLabel, playLabel, peekLabel } = Astro.props;
 ---
 
-<div class="cycle-peek" aria-hidden="true">
+<div class="cycle-peek" aria-hidden="true" data-pointer-vars>
   <span class="cycle-peek-ring"></span>
   <span class="cycle-peek-label mono">{peekLabel}</span>
 </div>
@@ -100,7 +102,6 @@ const { pauseLabel, playLabel, peekLabel } = Astro.props;
     [data-view="photo"][data-peek] [data-cycle-map] {
       visibility: visible !important;
       opacity: 1 !important;
-      clip-path: circle(9rem at var(--x, 50%) var(--y, 50%));
     }
     [data-view="photo"][data-peek] .cycle-peek {
       opacity: 1;
@@ -193,6 +194,23 @@ const { pauseLabel, playLabel, peekLabel } = Astro.props;
     // the pointer to leave, so switching back never shows the map again at once
     let armed = true;
 
+    // The lens hole in the map layer, written onto that one element per frame
+    const map = hero.querySelector<HTMLElement>("[data-cycle-map]");
+    let lensRaf = 0;
+    let lensAt = { x: 0, y: 0 };
+    const lens = (e: PointerEvent) => {
+      const r = hero.getBoundingClientRect();
+      lensAt = { x: e.clientX - r.left, y: e.clientY - r.top };
+      lensRaf ||= requestAnimationFrame(() => {
+        lensRaf = 0;
+        if (map && hero.hasAttribute("data-peek")) map.style.clipPath = `circle(9rem at ${lensAt.x}px ${lensAt.y}px)`;
+      });
+    };
+    const closePeek = () => {
+      hero.removeAttribute("data-peek");
+      map?.style.removeProperty("clip-path");
+    };
+
     // `at`: pointer position in the hero for a viewer switch, so the push centres there
     const cut = (at?: { x: number; y: number }) => {
       view = view === "photo" ? "map" : "photo";
@@ -204,7 +222,7 @@ const { pauseLabel, playLabel, peekLabel } = Astro.props;
         ["--ix", "--iy"].forEach((v) => hero.style.removeProperty(v));
       }
       armed = false;
-      hero.removeAttribute("data-peek");
+      closePeek();
       hero.setAttribute("data-cycled", "");
       hero.setAttribute("data-view", view);
       emit(hero, view === "map" ? "cycle:map" : "cycle:photo");
@@ -267,17 +285,21 @@ const { pauseLabel, playLabel, peekLabel } = Astro.props;
     // data-map-ready); before that the hover just starts loading it
     if (matchMedia("(pointer: fine)").matches) {
       hero.addEventListener("pointermove", (e) => {
-        if (view !== "photo" || !armed || hero.hasAttribute("data-peek")) return;
+        if (hero.hasAttribute("data-peek")) return lens(e);
+        if (view !== "photo" || !armed) return;
         if ((e.target as Element).closest("a, button")) return;
         prepared = true;
         emit(hero, "cycle:prepare");
         if (!hero.hasAttribute("data-map-ready")) return;
         emit(hero, "cycle:peek");
+        // Hole first, then open, so the full map never shows for a frame
+        const r = hero.getBoundingClientRect();
+        if (map) map.style.clipPath = `circle(9rem at ${e.clientX - r.left}px ${e.clientY - r.top}px)`;
         hero.setAttribute("data-peek", "");
       });
       hero.addEventListener("pointerleave", () => {
         armed = true;
-        hero.removeAttribute("data-peek");
+        closePeek();
       });
     }
 

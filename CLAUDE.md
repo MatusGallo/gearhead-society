@@ -30,13 +30,20 @@ Visual direction: inspired by marathonthegame.com (Bungie). Project-specific dec
 - Dark only, by brand choice. One accent: acid `#c0fe04`; `--color-violet` (#5200ff) only for rails and blocks.
   `/sommers` uses the same Marathon world with `data-theme="sommers"`, which swaps the accent to violet `#a98bff`.
   Sommers visuals are generated (`SommersPoster.astro`), never images taken from sommers.cz.
+  Sommers podcast (`SommersPodcast.astro`, `sommers.podcast`): one series, the latest episode featured, the rest behind
+  "all episodes", the producer credited with their socials. Spotify is embedded only after a click (it sets cookies,
+  listed in `cookies.ts` once real episodes are in); `demo: true` shows mock episodes and never contacts Spotify.
+  Scroll gesture `.levels`.
+  Sommers lists only the current edition and at most two upcoming after it (`upcomingEditions()`), no archive, no past
+  pages or galleries.
   Sommers has its own single ticket per meetup (the edition `price`, registration by e-mail), never Gearhead ticket
   tiers: on Sommers pages the header CTA reads `ui.ticket` and links to the next meetup's `#vstupenka` card.
 - Photos are graded plates via `Visual.astro`: greyscale sources, toned in CSS (`tone` acid/violet duotone or mono,
   `fx` grain/dots/lines, `hover` tone/glitch), so the duotone follows `[data-theme]`. Subject matter is gear: tactical,
   uniforms, MX, boots, helmets; no readable faces of real service members, no weapons in focus. Until the event photos
-  exist, CC0 stand-ins live in `src/assets/placeholder/` (use `ph()` / `placeholder()` from `src/data/placeholder.ts`,
-  sources in `credits.tsv`), each used once on a page.
+  exist, CC0 stand-ins live in `src/assets/placeholder/` (use `ph()` from `src/data/placeholder.ts`,
+  sources in `credits.tsv`), each used once on a page. `Visual` turns an imported photo into a webp srcset: pass
+  `sizes` for slots narrower than the viewport, `priority` only on the hero plate.
 - Galleries: photos go in `src/assets/galleries/<slug>/` and are picked up by file name (`galleryPhotos()`); every shoot
   comes in one 1:1 format, so the grid is uniform (square tiles, `object-cover`), not masonry. The page builds webp thumbnails and a large view, the lightbox (`Lightbox.astro`) downloads the original. `demo: true`
   fills an empty gallery with placeholders; without photos the page shows empty boxes; `kind: "film"` takes `video`.
@@ -57,10 +64,17 @@ Visual direction: inspired by marathonthegame.com (Bungie). Project-specific dec
 - No em or en dashes in visible text. Max one eyebrow label per three sections.
 - Motion is CSS only and each section gets its own gesture, never one entrance everywhere (catalogue at the motion
   block in `global.css`): load `.hero-in` `.title-in` `.rule-draw` `.plate-fade` `.tune-in` (contact channels) (no scan line or boot flicker on hero photos); scroll-driven `.heading-in`
-  `.wipe` `.settle` `.drift` `.parallax` `.boot-in` `.slide-in` `.reveal` `.surface` (footer wordmark) `.trace` (programme timeline rail fills down); click `.load-in`
-  (load more past editions on `/sommers`: 3 per page, button bar fills, cards drop in behind an accent scan bar); hover `.frame`, tone, glitch.
+  `.wipe` `.settle` `.drift` `.parallax` `.boot-in` `.slide-in` `.reveal` `.surface` (footer wordmark) `.trace` (programme timeline rail fills down); hover `.frame`, tone, glitch.
   Load and scroll motion are off under reduced motion.
-- Heroes: the contact page is a comms console (topics as TX channels with their mailto subjects, signal meter, address and reply time), never the generic `PageHero`. The events list (`/events`) has no photo, so it reads apart from the event pages: a departure board of every
+  Hand-written `:hover` effects sit in `@media (hover: hover) and (pointer: fine)` (Tailwind `hover:` already is),
+  hover movement (zoom, nudge, rotate) takes `motion-safe:`, press feedback stays at about 140 ms, and rapid or
+  keyboard-repeated actions skip their animation. `Pointer.astro` writes its vars only onto `[data-pointer-vars]`
+  descendants, so mark any new element that reads `--x/--y/--px/--py`. Animation review standards:
+  `.claude/skills/review-animations` (Emil Kowalski, MIT); load and hero motion may run longer than its 300 ms UI rule.
+- Heroes: an event on the waiting list (`isWaitlist`) swaps its whole hero and body for a centred waiting-list hero
+  (name, edition, date/venue/tickets as redacted TBA fields, no summary; `Waitlist size="lg"` is one bracketed row of
+  violet tag, field and button that opens from the centre, with `WaitCount size="lg"` under it once `waitlist` holds
+  the real count); nothing else of the event shows until it is announced. The contact page is a comms console (topics as TX channels with their mailto subjects, signal meter, address and reply time), never the generic `PageHero`. The events list (`/events`) has no photo, so it reads apart from the event pages: a departure board of every
   date with its sale state, a compact `Countdown` and `GlyphField` into `TagStrip` on the right. Photo heroes use `HeroPlate.astro` (no pointer lens or reticle; violet copy out of register,
   depth drift; its slot is in photo coordinates for `.track` detection boxes, as on the home hero). Sommers is an
   operations centre: `OpsLayer.astro` in the ScanField `world` slot (squad closing in, leader beam with T-minus,
@@ -83,8 +97,18 @@ Visual direction: inspired by marathonthegame.com (Bungie). Project-specific dec
 
 - Gearhead tickets: "buy" goes to `ticketUrl` (external shop) when set, otherwise to the order page
   `/events/<slug>/tickets` (form: wave on sale, 1..`site.orders.maxPerOrder`, name, e-mail, 18+ and terms checks, then a
-  confirmation with a numeric order number used as the variable symbol). It POSTs JSON to `site.orders.endpoint` when
+  confirmation with a numeric order number used as the variable symbol; shared with the ID card form in
+  `src/scripts/order-form.ts`). It POSTs JSON to `site.orders.endpoint` when
   set, otherwise composes a prefilled e-mail. Sommers keeps its own e-mail registration.
+- ID card (`/id-card`, in the main nav): `IdCard.astro` draws the two-sided member card at CR80 ratio in container
+  units, only in the footer stencil language (SpecPlate numeral row and spec columns, pixel glyph, a small
+  `GlyphField` corner seeded by the card number, a TagStrip-style acid tag carrying the NFC mark); keep the field
+  effect small. Front: handle, pronouns, country, languages, gear, number. Back: wordmark, short link, lost-card
+  line, house rules. The page shows both sides (flip in the hero, front and back in the anatomy).
+  Printed in English for everyone; no photo and no surname on it. The page's configurator rewrites `[data-f]` fields
+  live and orders like tickets (`site.idCard.endpoint` or a prefilled e-mail); pickup only in person at an event at
+  least `leadDays` out, after an ID check. Hero gesture: the card prints out of a slot (`.idh-eject`), tilts with the
+  pointer and flips. Form field styles (`.field`, `.field-error`, `.tick`) live in `global.css`.
 - Cookies: `CookieConsent.astro` (in Layout) stores the choice in the `gh_consent` cookie; accept and reject have equal
   weight; footer "cookie settings" (`[data-consent-open]`) reopens it. Optional scripts load only after consent
   (`site.analytics`, `gh:consent` event). Everything stored or loaded from third parties is listed in

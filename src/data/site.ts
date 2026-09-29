@@ -31,6 +31,29 @@ export const site = {
     payDays: 3,
   },
   /**
+   * Waiting list for events not on sale yet (src/components/Waitlist.astro). With `endpoint` set, the form POSTs
+   * `{ type: "waitlist", event, title, email, lang }` as JSON there; without it the sign-up goes out as a prefilled e-mail.
+   * TODO: set `endpoint` together with the order inbox.
+   */
+  waitlist: {
+    endpoint: undefined as string | undefined,
+  },
+  /**
+   * Gearhead ID card (src/pages/[lang]/id-card.astro). Orders go to `endpoint` as JSON when set, otherwise out as a
+   * prefilled e-mail, like ticket orders. Cards are picked up in person at an event, after an ID check.
+   * TODO: confirm the prices with the print shop; set `open: false` to close orders (the page then says so).
+   */
+  idCard: {
+    open: true,
+    endpoint: undefined as string | undefined,
+    /** CZK, production of one card */
+    price: 220,
+    /** CZK, optional holder with a carabiner */
+    holderPrice: 120,
+    /** Orders close this many days before the pickup event, so the print run makes it */
+    leadDays: 14,
+  },
+  /**
    * Optional analytics, loaded only after the visitor allows them in the cookie banner (CookieConsent.astro).
    * TODO: set `src` (e.g. a Plausible or Umami script) and list its cookies in src/data/cookies.ts. Until then the
    * analytics category stays in the banner but loads nothing.
@@ -65,4 +88,5 @@ export const nav: { label: L; path: string; sommers?: boolean }[] = [
   { label: ui.nav.galleries, path: "/galleries" },
   { label: ui.nav.about, path: "/about" },
   { label: ui.nav.contact, path: "/contact" },
+  { label: ui.nav.idCard, path: "/id-card" },
 ];

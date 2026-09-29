@@ -134,29 +134,41 @@ solid.forEach((row, r) => {
 
 const cx = (c: number) => c * C + C / 2;
 const cy = (r: number) => r * C + C / 2;
+const n = (v: number) => +v.toFixed(2);
 function stroke(k: Kind, x: number, y: number) {
-  if (k === "x") return `M${x - 2.6} ${y - 2.6}l5.2 5.2M${x + 2.6} ${y - 2.6}l-5.2 5.2`;
-  if (k === "plus") return `M${x - 2.4} ${y}h4.8M${x} ${y - 2.4}v4.8`;
-  if (k === "slash") return `M${x - 2.8} ${y + 2.8}l5.6 -5.6`;
-  return `M${x - 2.4} ${y}h4.8`;
+  if (k === "x") return `M${n(x - 2.6)} ${n(y - 2.6)}l5.2 5.2M${n(x + 2.6)} ${n(y - 2.6)}l-5.2 5.2`;
+  if (k === "plus") return `M${n(x - 2.4)} ${y}h4.8M${x} ${n(y - 2.4)}v4.8`;
+  if (k === "slash") return `M${n(x - 2.8)} ${n(y + 2.8)}l5.6 -5.6`;
+  if (k === "ring") return `M${n(x - 2.2)} ${y}a2.2 2.2 0 1 0 4.4 0a2.2 2.2 0 1 0 -4.4 0`;
+  return `M${n(x - 2.4)} ${y}h4.8`;
 }
+const box = (x: number, y: number, w: number, h: number) => `M${n(x)} ${n(y)}h${n(w)}v${n(h)}h${n(-w)}z`;
 const square: Partial<Record<Kind, number>> = { sq: 7, half: 4, dot: 1.8, fine: 1.1 };
+
+// Marks sharing a look go into one path, so the field is a handful of elements instead of hundreds
+const groups = new Map<string, { fill: boolean; ink: boolean; opacity: number; d: string }>();
+for (const m of marks) {
+  const x = cx(m.c), y = cy(m.r);
+  const s = square[m.k];
+  const fill = !!s;
+  const opacity = s ? (m.ink || s > 4 ? 1 : 0.75) : m.k === "plus" || m.k === "dash" ? 0.85 : 1;
+  const key = `${fill}${!!m.ink}${opacity}`;
+  const g = groups.get(key) ?? { fill, ink: !!m.ink, opacity, d: "" };
+  g.d += s ? box(x - s / 2, y - s / 2, s, s) : stroke(m.k, x, y);
+  groups.set(key, g);
+}
+const color = (ink: boolean) => (ink ? "var(--color-ink)" : "currentColor");
 ---
 
 <svg class:list={["glyph-field block", cls]} viewBox={`0 0 ${cols * C} ${rows * C}`} preserveAspectRatio="xMaxYMax meet" aria-hidden="true">
-  <g fill="currentColor">
-    {runs.map((b) => <rect x={b.c * C} y={b.r * C} width={b.w * C + 1} height={C + 0.5} />)}
-  </g>
-  <g stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="square">
-    {
-      marks.map((m) => {
-        const x = cx(m.c), y = cy(m.r);
-        const ink = m.ink ? "var(--color-ink)" : undefined;
-        const s = square[m.k];
-        if (s) return <rect x={x - s / 2} y={y - s / 2} width={s} height={s} fill={ink ?? "currentColor"} stroke="none" opacity={m.ink || s > 4 ? 1 : 0.75} />;
-        if (m.k === "ring") return <circle cx={x} cy={y} r="2.2" stroke={ink} />;
-        return <path d={stroke(m.k, x, y)} stroke={ink} opacity={m.k === "plus" || m.k === "dash" ? 0.85 : 1} />;
-      })
-    }
-  </g>
+  <path fill="currentColor" d={runs.map((b) => box(b.c * C, b.r * C, b.w * C + 1, C + 0.5)).join("")} />
+  {
+    [...groups.values()].map((g) =>
+      g.fill ? (
+        <path d={g.d} fill={color(g.ink)} opacity={g.opacity < 1 ? g.opacity : undefined} />
+      ) : (
+        <path d={g.d} fill="none" stroke={color(g.ink)} stroke-width="1.6" stroke-linecap="square" opacity={g.opacity < 1 ? g.opacity : undefined} />
+      ),
+    )
+  }
 </svg>

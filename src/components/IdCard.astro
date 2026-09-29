@@ -1,0 +1,234 @@
+---
+/**
+ * Gearhead ID card in the footer stencil language (SpecPlate + GlyphField + TagStrip), drawn at the real CR80 ratio
+ * (85.6 x 54 mm). Every size is in container units, so the card scales as one piece.
+ *   front  spaced numeral row (card number, year, language and gear counts), the handle, spec columns (country,
+ *          speaks, gear, number), notice line, pixel glyph; a mark field dissolving into the acid block bottom right
+ *          (NFC tap target in ink), and the vertical acid tag on the right edge
+ *   back   the wordmark, how to connect, short link (fallback for phones without NFC), lost-card line, house rules as
+ *          notices; the field hangs from the top into the tag
+ * The field is seeded by the card number, so no two cards share a pattern. Printed in English for everyone (see
+ * src/data/idcard.ts); only card data, no photo and no surname. `face="both"` stacks the two sides for a 3D flip,
+ * toggled by `data-flipped` on the root. `[data-f]` hooks let the configurator rewrite the fields live.
+ */
+import GlyphField from "./GlyphField.astro";
+import { barcode, gearTags, type IdCardData } from "../data/idcard";
+import { site } from "../data/site";
+
+interface Props {
+  data: IdCardData;
+  face?: "both" | "front" | "back";
+  /** Accessible summary; the card is announced as one image */
+  label: string;
+  class?: string;
+}
+const { data, face = "both", label, class: cls = "" } = Astro.props;
+const no = data.no ?? "----";
+const host = new URL(site.url).host;
+const gear = data.gear.map((k) => gearTags.find((g) => g.key === k)?.label.en ?? k);
+const country = new Intl.DisplayNames(["en"], { type: "region" }).of(data.country) ?? data.country;
+const nums = [no.slice(0, 2), no.slice(2), String(data.since), String(data.langs.length), String(data.gear.length)];
+const len = Math.max(8, data.handle.length);
+
+// Small field seeded by the card number: stairs or a column climbing into the tag, kept to one corner per side
+const seed = [...(data.no ?? data.handle)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 17);
+const frontVariant = [0, 3][seed % 2];
+const bars = barcode(data.no ?? "gearhead", 11);
+
+// Pixel marks from the stencil band: the reference X (plate glyph) and the notched square (tag)
+const plateGlyph = [1, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1];
+const tagX = [1, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 1];
+const tagNotch = [1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0, 1, 0, 1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 1];
+---
+
+<div class:list={["idc", face !== "both" && "idc-solo", cls]} role="img" aria-label={label} data-idc data-flipped="false">
+  <div class="idc-flip">
+    {
+      face !== "back" && (
+        <div class="idc-face idc-front" aria-hidden="true">
+          <div class="idc-field">
+            <GlyphField variant={frontVariant} seed={seed} cols={22} rows={12} class="size-full" />
+          </div>
+
+          <div class="idc-plate">
+            <p class="idc-nums">
+              <span data-f="no1">{nums[0]}</span><span data-f="no2">{nums[1]}</span><span>{nums[2]}</span><span data-f="nlangs">{nums[3]}</span><span data-f="ngear">{nums[4]}</span>
+            </p>
+            <p class="idc-label">Handle</p>
+            <p class="idc-handle" data-f="handle" style={`--len:${len}`}>{data.handle}</p>
+            <p class="idc-pron" data-f="pronouns">{data.pronouns}</p>
+            <div class="idc-cols">
+              <div><span>Country</span><span data-f="country">{data.country}</span><span data-f="countryName">{country}</span></div>
+              <div><span>Speaks</span><span data-f="langs">{data.langs.map((l) => l.toUpperCase()).join(" ")}</span></div>
+              <div data-f="gear"><span>Gear</span>{gear.length ? gear.map((g) => <span>{g}</span>) : <span>-</span>}</div>
+              <div><span>No.</span><span>GH <b data-f="no">{no}</b></span><span>Since {data.since}</span></div>
+            </div>
+          </div>
+          <p class="idc-notes"><span>18+ only</span><span>Consent, always</span><span>Tap for profile</span></p>
+          <svg class="idc-glyph" viewBox="0 0 5 4" shape-rendering="crispEdges">
+            {plateGlyph.map((on, i) => on === 1 && <rect x={i % 5} y={Math.floor(i / 5)} width="1" height="1" fill="currentColor" />)}
+          </svg>
+
+          <div class="idc-tag idc-tag-up">
+            <svg viewBox="0 0 5 5" shape-rendering="crispEdges">{tagX.map((on, i) => on === 1 && <rect x={i % 5} y={Math.floor(i / 5)} width="1" height="1" />)}</svg>
+            <span class="idc-rings">{Array.from({ length: 9 }, () => <i />)}</span>
+            <span class="idc-lines idc-bold"><span>Gearhead Society</span><span>Member ID</span></span>
+            <span class="idc-target" data-tap />
+            <span class="idc-lines idc-bold"><span>NFC tap</span></span>
+            <span class="idc-bars">{bars.map((h) => <i style={`height:${h * 0.22}cqw`} />)}</span>
+            <span class="idc-code"><span><i />G</span><span><i />H</span></span>
+          </div>
+          <span class="idc-grain" />
+        </div>
+      )
+    }
+    {
+      face !== "front" && (
+        <div class="idc-face idc-back" aria-hidden="true">
+          <div class="idc-field idc-field-top">
+            <GlyphField variant={2} seed={seed + 3} cols={20} rows={11} class="size-full" />
+          </div>
+
+          <div class="idc-plate">
+            <p class="idc-mark">Gearhead<br />Society</p>
+            <p class="idc-nums"><span data-f="no1">{nums[0]}</span><span data-f="no2">{nums[1]}</span><span>{nums[2]}</span></p>
+          </div>
+          <div class="idc-plate idc-plate-low">
+            <div class="idc-cols">
+              <div><span>Connect</span><span>Hold a phone</span><span>to the front</span></div>
+              <div><span>Link</span><span class="idc-case">{host}</span><span class="idc-case">/id/<b data-f="link">{no}</b></span></div>
+              <div><span>If found</span><span class="idc-case">{site.email}</span></div>
+            </div>
+            <p class="idc-notes idc-notes-in"><span>01 Consent, always</span><span>02 Respect every body</span><span>03 Adults only</span></p>
+          </div>
+          <svg class="idc-glyph idc-glyph-low" viewBox="0 0 5 4" shape-rendering="crispEdges">
+            {plateGlyph.map((on, i) => on === 1 && <rect x={i % 5} y={Math.floor(i / 5)} width="1" height="1" fill="currentColor" />)}
+          </svg>
+
+          <div class="idc-tag idc-tag-down">
+            <span class="idc-target" />
+            <span class="idc-lines idc-bold"><span>Gearhead Society</span><span>Prague</span></span>
+            <svg viewBox="0 0 5 5" shape-rendering="crispEdges">{tagNotch.map((on, i) => on === 1 && <rect x={i % 5} y={Math.floor(i / 5)} width="1" height="1" />)}</svg>
+            <span class="idc-bars">{bars.map((h) => <i style={`height:${h * 0.22}cqw`} />)}</span>
+            <span class="idc-rings">{Array.from({ length: 9 }, () => <i />)}</span>
+          </div>
+          <span class="idc-grain" />
+        </div>
+      )
+    }
+  </div>
+</div>
+
+<style is:global>
+  /* One card = 100cqw wide; heights follow the CR80 ratio (63.08cqw) */
+  .idc {
+    container-type: inline-size;
+    aspect-ratio: 85.6 / 54;
+    perspective: 1600px;
+  }
+  .idc-flip {
+    position: relative;
+    height: 100%;
+    transform-style: preserve-3d;
+    transition: transform 0.9s var(--ease-out-expo);
+  }
+  .idc[data-flipped="true"] .idc-flip { transform: rotateY(180deg); }
+  .idc-face {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    backface-visibility: hidden;
+    background: #0a0a0a;
+    color: var(--color-bone);
+    outline: 1px solid rgb(242 242 242 / 0.14);
+    outline-offset: -1px;
+    font-family: var(--font-mono);
+    font-size: 1.65cqw;
+    line-height: 1.18;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .idc-back { transform: rotateY(180deg); }
+  .idc-solo .idc-back { transform: none; }
+  .idc-face p { margin: 0; }
+  .idc-grain {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.14;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* Plate: numeral row, spec columns, notices (SpecPlate) */
+  .idc-plate { position: absolute; left: 4.4cqw; top: 4.4cqw; right: 16cqw; }
+  .idc-nums {
+    display: flex;
+    gap: 2.2em;
+    font-size: 1.8cqw;
+    letter-spacing: 0.35em;
+    font-variant-numeric: tabular-nums;
+  }
+  .idc-label { margin-top: 3.6cqw !important; }
+  .idc-handle {
+    margin-top: 0.6cqw !important;
+    overflow: hidden;
+    font-weight: 700;
+    font-size: min(5.4cqw, calc(60cqw / (var(--len) * 0.78)));
+    line-height: 1;
+    letter-spacing: 0.16em;
+    white-space: nowrap;
+  }
+  .idc-pron { min-height: 1.2em; margin-top: 0.8cqw !important; }
+  .idc-cols { display: flex; flex-wrap: wrap; gap: 2.2cqw 3.6cqw; margin-top: 3.4cqw; }
+  .idc-cols > div { display: grid; align-content: start; min-width: 0; max-width: 17cqw; }
+  .idc-cols span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .idc-cols b { font-weight: inherit; }
+  .idc-case { text-transform: none; }
+  .idc-notes { position: absolute; left: 4.4cqw; bottom: 4.4cqw; display: flex; gap: 3.2cqw; }
+  .idc-glyph { position: absolute; top: 4.4cqw; right: 16cqw; width: 4.4cqw; color: var(--color-bone); }
+
+  /* Field dissolving into the acid block (GlyphField), then the tag on the right edge */
+  .idc-field { position: absolute; right: 9cqw; bottom: 0; width: 30cqw; height: 16.4cqw; color: var(--color-acid); }
+
+  /* Vertical acid tag (TagStrip) */
+  .idc-tag {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 9cqw;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2cqw;
+    padding: 2.4cqw 0;
+    background: var(--color-acid);
+    color: var(--color-ink);
+    fill: currentColor;
+  }
+  .idc-tag-up { flex-direction: column-reverse; }
+  .idc-tag svg { width: 3.6cqw; flex: none; }
+  .idc-lines { display: flex; gap: 0.3cqw; font-size: 1.5cqw; line-height: 1.2; white-space: nowrap; }
+  .idc-bold { font-weight: 700; }
+  .idc-lines span { writing-mode: vertical-rl; }
+  .idc-tag-up .idc-lines span { rotate: 180deg; }
+  .idc-tag-down .idc-lines { flex-direction: row-reverse; }
+  .idc-rings { display: grid; grid-template-columns: repeat(3, 1cqw); gap: 0.35cqw; }
+  .idc-rings i,
+  .idc-code i { width: 1cqw; height: 1cqw; border: 0.25cqw solid currentColor; border-radius: 50%; }
+  .idc-target { display: grid; place-items: center; width: 2.4cqw; height: 2.4cqw; border: 0.35cqw solid currentColor; flex: none; }
+  .idc-target::after { content: ""; width: 0.8cqw; height: 0.8cqw; background: currentColor; }
+  .idc-bars { display: grid; gap: 0.3cqw; width: 4cqw; }
+  .idc-bars i { background: currentColor; }
+  .idc-code { display: flex; flex-direction: column-reverse; gap: 0.4cqw; font-size: 1.8cqw; font-weight: 700; }
+  .idc-code span { display: flex; align-items: center; gap: 0.3cqw; rotate: -90deg; }
+
+  /* Back: wordmark top left, the field hangs from the top right into the tag, plate low */
+  .idc-mark { font-weight: 700; font-size: 4cqw; line-height: 1.02; letter-spacing: 0.16em; margin-bottom: 2.6cqw !important; }
+  .idc-plate-low { top: auto; bottom: 4.4cqw; right: 14cqw; }
+  .idc-plate-low .idc-cols > div { max-width: none; }
+  .idc-notes-in { position: static; margin-top: 3cqw !important; }
+  .idc-field-top { top: 0; bottom: auto; height: 15.1cqw; width: 27.5cqw; }
+  .idc-glyph-low { top: auto; bottom: 4.4cqw; right: 13cqw; }
+</style>

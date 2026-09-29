@@ -6,9 +6,16 @@
 import { Map as MLMap, setWorkerUrl, type StyleSpecification } from "maplibre-gl";
 // Vite bundles the tile worker with its shared chunk into one file
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
-import "maplibre-gl/dist/maplibre-gl.css";
+// Linked on demand: a plain CSS import would be hoisted into every page that can load the map,
+// render-blocking 80 kB for a map that only mounts later. The import resolves once it has loaded.
+import cssUrl from "maplibre-gl/dist/maplibre-gl.css?url";
 
 setWorkerUrl(workerUrl);
+
+await new Promise((done) => {
+  const link = Object.assign(document.createElement("link"), { rel: "stylesheet", href: cssUrl, onload: done, onerror: done });
+  document.head.append(link);
+});
 
 const C = {
   ink: "#070707",

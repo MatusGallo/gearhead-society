@@ -8,15 +8,24 @@
  * - `hover` adds feedback inside a `.group`: "tone" fades the accent duotone in,
  *   "glitch" slices the frame for a moment before toning it.
  * - `fx` adds surface texture: grain, dot screen or scanlines.
+ * An imported photo becomes a webp srcset capped at its own width; pass `sizes` when the
+ * slot is narrower than the viewport. A string is used as is.
  */
+import { Image } from "astro:assets";
+import type { Photo } from "../data/placeholder";
+
 interface Props {
-  src?: string;
+  src?: Photo;
+  /** Rendered width for the srcset, as the <img> sizes attribute */
+  sizes?: string;
   alt?: string;
   hue?: number;
   class?: string;
   /** Extra classes on the <img>, e.g. a scroll-driven motion class */
   imgClass?: string;
   loading?: "eager" | "lazy";
+  /** The page's LCP image (hero plate): fetched before other images */
+  priority?: boolean;
   /** "contain" keeps posters with text fully visible */
   fit?: "cover" | "contain";
   tone?: "none" | "mono" | "acid" | "violet";
@@ -28,11 +37,13 @@ interface Props {
 
 const {
   src,
+  sizes = "100vw",
   alt = "",
   hue = 72,
   class: cls = "",
   imgClass = "",
   loading = "lazy",
+  priority = false,
   fit = "cover",
   tone = "none",
   hover,
@@ -44,23 +55,27 @@ const bg = `radial-gradient(120% 90% at 20% 110%, hsl(${hue} 70% 42% / .5), tran
   linear-gradient(160deg, #18181c, #0b0b0d)`;
 // A hover tone on a mono plate fades the accent in; on a toned plate it is already there
 const toneClass = tone === "none" ? "" : tone === "mono" ? (hover ? "plate tone-acid tone-rest" : "plate") : `plate tone-${tone}`;
+const style = focus ? `object-position:${focus}` : undefined;
+const imgCls = ["absolute inset-0 size-full", fit === "contain" ? "object-contain" : "object-cover", imgClass];
+const widths = typeof src === "object" ? [480, 800, 1200, 1600, 2400].filter((w) => w < src.width).concat(Math.min(src.width, 2400)) : [];
+const fetchpriority = priority ? "high" : undefined;
 ---
 
 <div class:list={["relative overflow-hidden bg-steel", toneClass, hover && `plate-${hover}`, cls]}>
   {
     src ? (
       <>
-        {fit === "contain" && (
-          <img src={src} alt="" aria-hidden="true" class="absolute inset-0 size-full scale-110 object-cover opacity-50 blur-2xl" />
+        {fit === "contain" &&
+          (typeof src === "object" ? (
+            <Image src={src} width={Math.min(src.width, 320)} format="webp" alt="" aria-hidden="true" class="absolute inset-0 size-full scale-110 object-cover opacity-50 blur-2xl" />
+          ) : (
+            <img src={src} alt="" aria-hidden="true" class="absolute inset-0 size-full scale-110 object-cover opacity-50 blur-2xl" />
+          ))}
+        {typeof src === "object" ? (
+          <Image src={src} width={widths.at(-1)} widths={widths} sizes={sizes} format="webp" quality={75} alt={alt} loading={loading} fetchpriority={fetchpriority} decoding="async" style={style} class:list={imgCls} />
+        ) : (
+          <img src={src} alt={alt} loading={loading} fetchpriority={fetchpriority} decoding="async" style={style} class:list={imgCls} />
         )}
-        <img
-          src={src}
-          alt={alt}
-          loading={loading}
-          decoding="async"
-          style={focus ? `object-position:${focus}` : undefined}
-          class:list={["absolute inset-0 size-full", fit === "contain" ? "object-contain" : "object-cover", imgClass]}
-        />
         {fx.map((f) => <span class={`plate-${f}`} aria-hidden="true" />)}
       </>
     ) : (

@@ -1,5 +1,5 @@
 import type { ImageMetadata } from "astro";
-import { ph, placeholderSet } from "./placeholder";
+import { ph, placeholderSet, type Photo } from "./placeholder";
 
 export type GalleryKind = "photos" | "wall" | "shoot" | "film";
 
@@ -9,8 +9,8 @@ export type Gallery = {
   title: string;
   date: string;
   kind: GalleryKind;
-  /** Cover image URL; defaults to the first photo */
-  cover?: string;
+  /** Cover photo; defaults to the first photo */
+  cover?: Photo;
   /** Aftermovie embed URL (YouTube/Vimeo "embed" link), for kind "film" */
   video?: string;
   /**
@@ -19,8 +19,6 @@ export type Gallery = {
    */
   demo?: boolean;
   hue: number;
-  /** Slug of the Sommers edition the gallery belongs to; kept off the Gearhead lists, shown on that edition */
-  sommers?: string;
 };
 
 /**
@@ -40,7 +38,7 @@ export function galleryPhotos(g: Gallery): ImageMetadata[] {
   return [...placeholderSet.slice(start), ...placeholderSet.slice(0, start)];
 }
 
-export const galleryCover = (g: Gallery) => g.cover ?? galleryPhotos(g)[0]?.src;
+export const galleryCover = (g: Gallery) => g.cover ?? galleryPhotos(g)[0];
 
 // TODO: ph() covers are CC0 stock stand-ins until the real photos are in
 export const galleries: Gallery[] = [
@@ -53,12 +51,3 @@ export const galleries: Gallery[] = [
   { slug: "frostbite-2026-film", cover: ph("comms"), title: "Frostbite 2026", date: "2026-01-24", kind: "film", hue: 220 },
 ].sort((a, b) => b.date.localeCompare(a.date)) as Gallery[];
 
-// Sommers meetups, one gallery per past edition (demo until the photographer delivers)
-export const sommersGalleries: Gallery[] = [
-  { slug: "sommers-tuklaty-2026", sommers: "oralni-odpoledne-tuklaty", title: "Sommers Tuklaty 2026", date: "2026-06-06", kind: "photos", demo: true, hue: 262 },
-  { slug: "sommers-48", sommers: "48-sraz-berounkovani-po-nasem", title: "Sommers 48", date: "2026-05-29", kind: "photos", demo: true, hue: 248 },
-  { slug: "sommers-holedna-2026", sommers: "jarni-vabeni-xii", title: "Sommers Holedná 2026", date: "2026-04-11", kind: "photos", demo: true, hue: 275 },
-  { slug: "sommers-47", sommers: "47-sraz-radostne-vanoce-a-rozverny-silvestr", title: "Sommers 47", date: "2026-02-06", kind: "photos", demo: true, hue: 240 },
-];
-
-export const editionGalleries = (edition: string) => sommersGalleries.filter((g) => g.sommers === edition);

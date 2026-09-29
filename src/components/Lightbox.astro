@@ -151,10 +151,10 @@ const t = translator(lang);
       animation: lb-open 0.45s var(--ease-out-expo);
     }
     .lb-frame[data-dir] img {
-      animation: lb-swap 0.4s var(--ease-out-expo);
+      animation: lb-swap 0.2s var(--ease-out-expo);
     }
     .lb-frame[data-dir="prev"] img {
-      --from: -28px;
+      --from: -16px;
     }
   }
   @keyframes lb-open {
@@ -162,7 +162,7 @@ const t = translator(lang);
     to { clip-path: inset(0); }
   }
   @keyframes lb-swap {
-    from { opacity: 0; transform: translateX(var(--from, 28px)); }
+    from { opacity: 0; transform: translateX(var(--from, 16px)); }
     to { opacity: 1; transform: none; }
   }
 </style>
@@ -178,6 +178,7 @@ const t = translator(lang);
     const download = dialog.querySelector<HTMLAnchorElement>("[data-lb-download]")!;
     const size = dialog.querySelector<HTMLElement>("[data-lb-size]")!;
     let index = 0;
+    let lastSwap = 0;
 
     const show = (i: number, dir?: "next" | "prev") => {
       index = (i + items.length) % items.length;
@@ -190,8 +191,12 @@ const t = translator(lang);
       download.href = it.download;
       download.download = it.name;
       size.textContent = `${it.w} × ${it.h}`;
-      if (dir) {
-        frame.removeAttribute("data-dir");
+      // Rapid paging (held arrow key, quick clicks) swaps instantly instead of restarting the slide each time
+      const now = performance.now();
+      const rapid = now - lastSwap < 250;
+      lastSwap = now;
+      frame.removeAttribute("data-dir");
+      if (dir && !rapid) {
         void frame.offsetWidth; // restart the swap animation
         frame.setAttribute("data-dir", dir);
       }

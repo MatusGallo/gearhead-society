@@ -1,0 +1,28 @@
+---
+/**
+ * Square cover for a Sommers podcast episode: the episode's photo as a graded plate (violet duotone, dot screen),
+ * with the series mark and the episode number set over it. Scales via cqw units, from list thumbnail to feature.
+ */
+import Visual from "./Visual.astro";
+import type { Photo } from "../data/placeholder";
+
+interface Props {
+  src?: Photo;
+  /** Episode number, e.g. "05" */
+  number: string;
+  sizes: string;
+  class?: string;
+  /** Hide the series mark on thumbnails too small to read it */
+  compact?: boolean;
+}
+const { src, number, sizes, class: cls = "", compact = false } = Astro.props;
+---
+
+<div class:list={["@container relative aspect-square", cls]} aria-hidden="true">
+  <Visual src={src} sizes={sizes} tone="violet" fx={["dots"]} class="!absolute inset-0">
+    <div class="absolute inset-0 bg-gradient-to-t from-ink/85 via-ink/10 to-transparent"></div>
+    {!compact && <span class="mono absolute top-[7cqw] left-[7cqw] bg-acid px-[2.5cqw] py-[1cqw] text-[6cqw] text-ink">Sommers / Podcast</span>}
+    <span class:list={["display absolute !leading-[0.8] text-acid", compact ? "right-[8cqw] bottom-[8cqw] text-[42cqw]" : "right-[6cqw] bottom-[6cqw] text-[34cqw]"]}>{number}</span>
+    {!compact && <span class="display absolute bottom-[8cqw] left-[7cqw] text-[8cqw] !leading-[0.9] text-bone">Na<br />vlně</span>}
+  </Visual>
+</div>

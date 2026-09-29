@@ -1,5 +1,5 @@
 import { href, locale, ui, type L, type Lang } from "../i18n";
-import { ph } from "./placeholder";
+import { ph, type Photo } from "./placeholder";
 
 /** Tickets sell in waves, each dearer than the last: Early bird, Classic, Late runner */
 export type TicketTier = {
@@ -33,11 +33,16 @@ export type EventItem = {
   lineup: string[];
   dressCode: L;
   tickets: TicketTier[];
-  /** True once the sale runs; before that no wave is marked as current */
+  /**
+   * True once the sale runs; before that no wave is marked as current and the event is on the waiting list only
+   * (`isWaitlist`): the site shows its name, edition, summary and the waiting list, nothing about date, venue or tickets
+   */
   saleOpen?: boolean;
   ticketUrl?: string;
-  /** Path under /public, e.g. "/images/events/pressure.jpg". TODO: ph() placeholders (src/data/placeholder.ts) stand in until real photos exist */
-  image?: string;
+  /** People on the waiting list, the real count from the sign-ups; omit to hide the counter */
+  waitlist?: number;
+  /** Imported photo (src/assets) or a path under /public. TODO: ph() placeholders (src/data/placeholder.ts) stand in until real photos exist */
+  image?: Photo;
   /** Seed for the generated scan visual */
   seed: number;
 };
@@ -131,6 +136,8 @@ export const events: EventItem[] = [
     tickets: waves([450, 650, 850]),
     image: ph("dust-storm"),
     seed: 23,
+    // TODO: demo count to show the waiting-list counter; replace with the real number of sign-ups before launch
+    waitlist: 181,
   },
   {
     slug: "pride-gear-2027",
@@ -179,7 +186,11 @@ export const upcomingEvents = () =>
     .filter(isUpcoming)
     .sort((a, b) => (a.start ? Date.parse(a.start) : Infinity) - (b.start ? Date.parse(b.start) : Infinity));
 
-export const nextEvent = () => upcomingEvents().find((e) => e.start);
+/** Not announced yet: only the name, edition, summary and the waiting list go on the site */
+export const isWaitlist = (e: EventItem) => !e.saleOpen;
+
+/** The next announced night; waiting-list events have no date to count down to */
+export const nextEvent = () => upcomingEvents().find((e) => e.start && !isWaitlist(e));
 
 /** Waves in order with their state; the current one is the first not sold out and not past its end */
 export function ticketWaves(e: EventItem): TicketWave[] {

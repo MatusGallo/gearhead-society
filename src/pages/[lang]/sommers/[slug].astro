@@ -5,36 +5,17 @@ import ContentRail from "../../../components/ContentRail.astro";
 import Icon from "../../../components/Icon.astro";
 import SommersPoster from "../../../components/SommersPoster.astro";
 import EditionMark from "../../../components/EditionMark.astro";
-import { getImage } from "astro:assets";
-import HeroPlate from "../../../components/HeroPlate.astro";
-import ScanField from "../../../components/ScanField.astro";
-import Visual from "../../../components/Visual.astro";
-import { editionGalleries, galleryPhotos } from "../../../data/galleries";
-import { dissolve, dissolveDown } from "../../../data/dissolve";
-import { editionLabel, editions, formatRange, isUpcomingEdition, sommers, type SommersEdition } from "../../../data/sommers";
+import { editionLabel, formatRange, sommers, upcomingEditions, type SommersEdition } from "../../../data/sommers";
 import { href, langs, translator, ui, type Lang } from "../../../i18n";
 
 export function getStaticPaths() {
-  return langs.flatMap((lang) => editions.map((edition) => ({ params: { lang, slug: edition.slug }, props: { edition } })));
+  return langs.flatMap((lang) => upcomingEditions().map((edition) => ({ params: { lang, slug: edition.slug }, props: { edition } })));
 }
 
 const lang = Astro.params.lang as Lang;
 const t = translator(lang);
 const { edition: e } = Astro.props as { edition: SommersEdition };
-const upcoming = isUpcomingEdition(e);
 const label = editionLabel(e, lang);
-// Past meetups: one gallery, previewed as a row of photos; its first photo carries the hero
-const gallery = upcoming ? undefined : editionGalleries(e.slug)[0];
-const galleryHref = gallery && href(lang, `/galleries/${gallery.slug}`);
-const shots = gallery ? galleryPhotos(gallery) : [];
-const heroShot = shots[0];
-const thumbs = await Promise.all(
-  shots.slice(1, 13).map(async (photo) => (await getImage({ src: photo, width: Math.min(600, photo.width), format: "webp", quality: 75 })).src),
-);
-const shotCount = lang === "cs" ? `${shots.length} ${shots.length === 1 ? "fotka" : shots.length < 5 ? "fotky" : "fotek"}` : `${shots.length} ${shots.length === 1 ? "photo" : "photos"}`;
-const tixDots = `--dl:${dissolve(11, true)};--dr:${dissolve(29, false)}`;
-// The full-gallery block sits in the photos' break-up, so it crumbles in their graphite instead of violet
-const galleryDots = `--dl:${dissolve(11, true, "#2e2e2e")};--dr:${dissolve(29, false, "#2e2e2e")};--dt:${dissolveDown(41, { rows: 6, cell: 5, fill: "#2e2e2e", up: true, falloff: 2.6 })};--dbm:${dissolveDown(53, { rows: 4, cell: 5, fill: "#2e2e2e", falloff: 2.6 })}`;
 const register = t({ cs: "Registrace", en: "Register" });
 const mailto = `mailto:${sommers.email}?subject=${encodeURIComponent(`${register}: ${label}${e.number ? "" : ` ${e.title[lang]}`}`)}`;
 
@@ -46,7 +27,7 @@ const factGroups = [
     rows: clean([
       [t({ cs: "Datum", en: "Dates" }), formatRange(e.start, e.end, lang)],
       [t({ cs: "Místo", en: "Place" }), e.place[lang]],
-      [ui.ticket[lang], upcoming ? e.price?.[lang] : undefined],
+      [ui.ticket[lang], e.price?.[lang]],
       [t({ cs: "Kapacita", en: "Capacity" }), e.capacity?.[lang]],
     ]),
   },
@@ -63,7 +44,7 @@ const factGroups = [
 // Content blocks in reading order
 const sections = [
   e.kind === "sraz" && { id: "bezpecnost", title: t({ cs: "Bezpečnost", en: "Safety" }), list: sommers.safety[lang] },
-  e.kind === "sraz" && upcoming && { id: "registrace", title: register, list: sommers.registration[lang] },
+  e.kind === "sraz" && { id: "registrace", title: register, list: sommers.registration[lang] },
   e.accommodation && { id: "ubytovani", title: t({ cs: "Ubytování", en: "Accommodation" }), paras: e.accommodation[lang] },
 ].filter(Boolean) as { id: string; title: string; list?: string[]; paras?: string[] }[];
 
@@ -77,46 +58,7 @@ const dayDate = (i: number) => {
 ---
 
 <Layout lang={lang} theme="sommers" title={`${label}: ${e.title[lang]}`} description={e.summary[lang]}>
-  <!-- HERO: past meetups get a photo hero with a status strip; upcoming ones the poster and the countdown -->
-  {
-    !upcoming && (
-      <section class="relative flex min-h-[80dvh] flex-col justify-end overflow-hidden pt-32" data-pointer>
-        {heroShot ? (
-          <HeroPlate src={heroShot.src} ratio={heroShot.width / heroShot.height} />
-        ) : (
-          <ScanField seed={e.seed} labels={[]} pauseLabel={ui.pause[lang]} playLabel={ui.play[lang]} class="!absolute inset-0" />
-        )}
-        <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink via-ink/40 to-transparent"></div>
-        <div class="hero-in relative mx-auto w-full max-w-[1400px] px-4 pb-10 sm:px-6">
-          <div style="--i:1"><EditionMark edition={e} lang={lang} class="text-[clamp(2.5rem,6vw,4rem)]" /></div>
-          <h1 class="title-in display mt-6 max-w-[16ch] text-[clamp(1.85rem,8vw,6rem)] text-balance hyphens-auto" style="--i:2">{e.title[lang]}</h1>
-        </div>
-        <div class="relative bg-acid text-ink">
-          <div class="hero-in mx-auto grid max-w-[1400px] gap-x-10 gap-y-3 px-4 pt-4 sm:px-6 md:grid-cols-[auto_1fr_auto] md:pt-0">
-            <p class="mono flex items-center gap-2 text-xs md:py-5" style="--i:3"><span class="size-1.5 bg-ink" aria-hidden="true"></span>{t({ cs: "Proběhlo", en: "Past" })}</p>
-            <p class="mono flex flex-wrap items-center gap-x-5 gap-y-1 text-xs sm:text-sm" style="--i:4">
-              <span>{formatRange(e.start, e.end, lang)}</span>
-              <span>{e.place[lang]}</span>
-              {e.team?.photographer && <span>{t({ cs: "Foto", en: "Photos" })}: {e.team.photographer}</span>}
-            </p>
-            {gallery ? (
-              <a href={galleryHref} class="tix relative -mx-4 flex items-center justify-between gap-5 bg-violet px-4 py-3 sm:-mx-6 sm:px-6 md:mx-0 md:px-5" style={`--i:5;${tixDots}`}>
-                <span class="grid gap-1.5">
-                  <span class="display text-xs text-acid">{shotCount}</span>
-                  <span class="tix-box display bg-acid px-2 pt-1 pb-0.5 text-2xl leading-none text-violet sm:text-3xl">{t({ cs: "Galerie", en: "Gallery" })}</span>
-                </span>
-                <Icon name="arrow-right" class="tix-arrow-r tix-arrow size-6 text-acid" />
-              </a>
-            ) : (
-              <span class="pb-4 md:pb-0" />
-            )}
-          </div>
-        </div>
-      </section>
-    )
-  }
-  {
-    upcoming && (
+  <!-- HERO: the poster and the countdown -->
   <section class="pt-15">
     <div class="mx-auto grid max-w-[1400px] items-end gap-12 px-4 pt-16 pb-14 sm:px-6 lg:grid-cols-[1.15fr_1fr]">
       <div class="hero-in">
@@ -125,22 +67,16 @@ const dayDate = (i: number) => {
         <p class="mono mt-5 text-sm text-bone/85" style="--i:2">
           {formatRange(e.start, e.end, lang)}, {e.place[lang]}
         </p>
-        {
-          upcoming && (
-            <div class="mt-8 flex flex-col gap-6 sm:flex-row sm:items-center" style="--i:3">
-              <Countdown target={`${e.start}T15:00:00+02:00`} labels={ui.countdown[lang]} />
-              <a href={mailto} class="btn btn-acid self-start sm:self-auto">{register} <Icon name="envelope-simple" /></a>
-            </div>
-          )
-        }
+        <div class="mt-8 flex flex-col gap-6 sm:flex-row sm:items-center" style="--i:3">
+          <Countdown target={`${e.start}T15:00:00+02:00`} labels={ui.countdown[lang]} />
+          <a href={mailto} class="btn btn-acid self-start sm:self-auto">{register} <Icon name="envelope-simple" /></a>
+        </div>
       </div>
       <div class="frame frame-on">
         <SommersPoster edition={e} lang={lang} />
       </div>
     </div>
   </section>
-    )
-  }
 
   <!-- CONTENT -->
   <section class="relative mx-auto grid max-w-[1400px] gap-14 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_22rem] lg:pl-24">
@@ -155,10 +91,10 @@ const dayDate = (i: number) => {
           e.kind === "sraz" ? (
             <>
               <p class="text-xl text-bone">
-                {upcoming ? t({ cs: "Sraz se koná o víkendu", en: "The meetup takes place on the weekend of" }) : t({ cs: "Sraz se konal o víkendu", en: "The meetup took place on the weekend of" })}{" "}
+                {t({ cs: "Sraz se koná o víkendu", en: "The meetup takes place on the weekend of" })}{" "}
                 <span class="text-acid">{formatRange(e.start, e.end, lang)}</span>. {t({ cs: "Místo konání", en: "Place" })}: {e.place[lang]}.
               </p>
-              {upcoming && <p>{sommers.readFirst[lang]}</p>}
+              <p>{sommers.readFirst[lang]}</p>
               {sommers.intro[lang].map((p) => <p>{p}</p>)}
             </>
           ) : (
@@ -298,25 +234,21 @@ const dayDate = (i: number) => {
       </div>
 
       <!-- One ticket per meetup, no tiers: the price covers accommodation and food -->
-      {
-        upcoming && (
-          <div id="vstupenka" class="frame frame-on scroll-mt-24 border border-acid p-6">
-            <p class="mono text-xs text-acid">{ui.ticket[lang]}</p>
-            {e.price && <p class="display mt-3 text-3xl">{e.price[lang]}</p>}
-            <p class="mt-3 text-sm text-bone/80">
-              {t({ cs: "Jedna vstupenka pro všechny, žádné typy. Platíš jen náklady na ubytování a jídlo.", en: "One ticket for everyone, no tiers. You only pay for accommodation and food." })}
-            </p>
-            <a href={mailto} class="btn btn-acid mt-5 w-full">{register} <Icon name="envelope-simple" /></a>
-            <p class="mt-4 text-sm text-bone/80">{t({ cs: "Pouze e-mailem. Uveď svoji přezdívku pro registrační tabulku a jmenovku.", en: "By e-mail only. Include the nickname for the registration list and your name tag." })}</p>
-            <a href={mailto} class="mt-2 inline-flex min-h-11 items-center gap-2 text-sm break-all text-acid underline underline-offset-4 hover:text-bone">
-              <Icon name="envelope-simple" /> {sommers.email}
-            </a>
-          </div>
-        )
-      }
+      <div id="vstupenka" class="frame frame-on scroll-mt-24 border border-acid p-6">
+        <p class="mono text-xs text-acid">{ui.ticket[lang]}</p>
+        <p class="display mt-3 text-3xl">{e.price?.[lang] ?? t({ cs: "Cena brzy", en: "Price soon" })}</p>
+        <p class="mt-3 text-sm text-bone/80">
+          {t({ cs: "Jedna vstupenka pro všechny, žádné typy. Platíš jen náklady na ubytování a jídlo.", en: "One ticket for everyone, no tiers. You only pay for accommodation and food." })}
+        </p>
+        <a href={mailto} class="btn btn-acid mt-5 w-full">{register} <Icon name="envelope-simple" /></a>
+        <p class="mt-4 text-sm text-bone/80">{t({ cs: "Pouze e-mailem. Uveď svoji přezdívku pro registrační tabulku a jmenovku.", en: "By e-mail only. Include the nickname for the registration list and your name tag." })}</p>
+        <a href={mailto} class="mt-2 inline-flex min-h-11 items-center gap-2 text-sm break-all text-acid underline underline-offset-4 hover:text-bone">
+          <Icon name="envelope-simple" /> {sommers.email}
+        </a>
+      </div>
 
       {
-        e.deadlines && upcoming && (
+        e.deadlines && (
           <div class="border border-line bg-coal">
             <p class="mono bg-violet px-4 py-2 text-xs text-acid">{t({ cs: "Důležité termíny", en: "Key dates" })}</p>
             <ul class="text-sm">
@@ -351,36 +283,4 @@ const dayDate = (i: number) => {
     </aside>
   </section>
 
-  <!-- Past meetups: two rows of photos crumbling into pixels at the bottom; the ticket-style block into the full gallery sits in the break-up -->
-  {
-    gallery && (
-      <section id="galerie" class="scroll-mt-24 pb-24">
-        <div class="mx-auto max-w-[1400px] px-4 sm:px-6 lg:pl-24">
-          <h2 class="heading-in display text-3xl sm:text-4xl">{t({ cs: "Galerie", en: "Gallery" })}</h2>
-          <div class="mt-8 [mask-image:linear-gradient(to_bottom,#000_40%,rgb(0_0_0/0.4))]">
-          <div class="dissolve-b grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6" style={`--db:${dissolveDown(17)}`}>
-            {thumbs.map((src, i) => (
-              <a href={galleryHref} class:list={["group frame block", i >= 6 && "hidden lg:block"]} aria-label={`${gallery.title}, ${t({ cs: "fotka", en: "photo" })} ${i + 2}`}>
-                <Visual src={src} tone="mono" hover="tone" fx={["dots"]} imgClass="settle" class="aspect-square" />
-              </a>
-            ))}
-          </div>
-          </div>
-        </div>
-        <div class="relative mx-auto -mt-20 max-w-[1400px] px-4 sm:px-6 lg:pl-24">
-          <div class="flex justify-center">
-            <a href={galleryHref} class="tix relative flex w-full items-center justify-between gap-6 bg-line px-5 py-3 sm:w-auto" style={galleryDots}>
-              <span class="tix-v tix-up" aria-hidden="true"></span>
-              <span class="tix-v tix-down" aria-hidden="true"></span>
-              <span class="grid gap-1.5">
-                <span class="display text-xs text-acid">{shotCount}</span>
-                <span class="tix-box display bg-acid px-2 pt-1 pb-0.5 text-2xl leading-none text-ink sm:text-3xl">{t({ cs: "Celá galerie", en: "Full gallery" })}</span>
-              </span>
-              <Icon name="arrow-right" class="tix-arrow-r tix-arrow size-6 text-acid" />
-            </a>
-          </div>
-        </div>
-      </section>
-    )
-  }
 </Layout>

@@ -1,7 +1,6 @@
 /** Minimal i18n: every page lives under /cs/ or /en/, copy is stored as { cs, en } pairs. */
 export const langs = ["cs", "en"] as const;
 export type Lang = (typeof langs)[number];
-export const defaultLang: Lang = "cs";
 
 /** A localized value */
 export type L<T = string> = { cs: T; en: T };
@@ -33,6 +32,7 @@ export const ui = {
     galleries: { cs: "Galerie", en: "Galleries" },
     about: { cs: "O nás", en: "About" },
     contact: { cs: "Kontakt", en: "Contact" },
+    idCard: { cs: "ID karta", en: "ID card" },
   },
   tickets: { cs: "Vstupenky", en: "Tickets" },
   /** Sommers sells a single ticket per meetup, no tiers */

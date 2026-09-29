@@ -4,17 +4,18 @@
  * screen with the order number and what happens next. The order goes to `site.orders.endpoint` as JSON when it is
  * set, otherwise out as a prefilled e-mail. Without JavaScript the form itself is a mailto form.
  * With `ticketUrl` set the page just points to the shop; with no wave on sale it shows the waves and when to come back.
+ * Waiting-list events (`isWaitlist`) get no order page.
  */
 import Layout from "../../../../layouts/Layout.astro";
 import ContentRail from "../../../../components/ContentRail.astro";
 import Icon from "../../../../components/Icon.astro";
 import TicketWaves from "../../../../components/TicketWaves.astro";
-import { currentWave, events, formatDate, formatNumeric, formatPrice, formatTime, isUpcoming, type EventItem } from "../../../../data/events";
+import { currentWave, events, formatDate, formatNumeric, formatPrice, formatTime, isUpcoming, isWaitlist, type EventItem } from "../../../../data/events";
 import { site } from "../../../../data/site";
 import { href, langs, translator, ui, type Lang } from "../../../../i18n";
 
 export function getStaticPaths() {
-  return langs.flatMap((lang) => events.filter((e) => e.tickets.length).map((event) => ({ params: { lang, slug: event.slug }, props: { event } })));
+  return langs.flatMap((lang) => events.filter((e) => e.tickets.length && !isWaitlist(e)).map((event) => ({ params: { lang, slug: event.slug }, props: { event } })));
 }
 
 const lang = Astro.params.lang as Lang;
@@ -344,56 +345,8 @@ const field = "field mt-2 block w-full";
     background: linear-gradient(to right, var(--color-acid) 50%, transparent 50%) left / 200% 100%;
   }
 
-  .field {
-    min-height: 3.25rem;
-    padding: 0 1rem;
-    border: 1px solid var(--color-line);
-    background: var(--color-ink);
-    color: var(--color-bone);
-    transition: border-color 0.25s var(--ease-out-expo);
-  }
-  .field:hover { border-color: color-mix(in oklab, var(--color-bone) 35%, transparent); }
-  .field:focus { outline: none; border-color: var(--color-acid); }
-  .field::placeholder { color: color-mix(in oklab, var(--color-mute) 70%, transparent); }
-  .field[aria-invalid="true"] { border-color: var(--color-signal); }
-
-  .field-error {
-    display: block;
-    margin-top: 0.4rem;
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--color-signal);
-  }
-  .field-error:empty { display: none; }
-
-  /* Square check box, accent fill with an ink tick */
-  .tick {
-    appearance: none;
-    position: relative;
-    flex-shrink: 0;
-    width: 1.35rem;
-    height: 1.35rem;
-    border: 1px solid var(--color-bone);
-    background: var(--color-ink);
-  }
-  .tick:checked { background: var(--color-acid); border-color: var(--color-acid); }
-  .tick:checked::after {
-    content: "";
-    position: absolute;
-    left: 0.42rem;
-    top: 0.14rem;
-    width: 0.4rem;
-    height: 0.75rem;
-    border: solid var(--color-ink);
-    border-width: 0 2px 2px 0;
-    transform: rotate(45deg);
-  }
-  .tick[aria-invalid="true"] { border-color: var(--color-signal); }
-
   @media (prefers-reduced-motion: no-preference) {
-    .step[data-state="live"] .step-bar { animation: step-fill 1.6s var(--ease-out-expo) infinite alternate; }
+    .step[data-state="live"] .step-bar { animation: step-fill 1.6s cubic-bezier(0.65, 0, 0.35, 1) infinite alternate; }
     /* The confirmation lands like a stamp: a hair large, then pressed flat */
     [data-order-done]:not([hidden]) .stamp { animation: stamp 0.55s var(--ease-out-expo) both; }
   }
@@ -408,6 +361,8 @@ const field = "field mt-2 block w-full";
 </style>
 
 <script>
+  import { mailOrder, money, orderRef, postOrder, showDone, validation } from "../../../../scripts/order-form";
+
   type Copy = {
     subject: string;
     lines: Record<"ref" | "event" | "wave" | "qty" | "total" | "name" | "email" | "note" | "agree", string>;
@@ -425,7 +380,6 @@ const field = "field mt-2 block w-full";
     const qty = form.elements.namedItem("qty") as HTMLInputElement;
     const max = Number(qty.max);
     const $ = <T extends HTMLElement = HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
-    const money = (n: number) => `${n.toLocaleString("cs-CZ")} CZK`;
     const steps = [...document.querySelectorAll<HTMLElement>("[data-steps] [data-step]")];
 
     const setStep = (n: number) => steps.forEach((s, i) => (s.dataset.state = i < n ? "done" : i === n ? "live" : "next"));
@@ -457,44 +411,20 @@ const field = "field mt-2 block w-full";
       if (i >= 0) setStep(i);
     });
 
-    // Validation: one message per field, shown after the first submit and cleared as it is fixed
-    const checks: [keyof Copy["errors"], () => boolean][] = [
-      ["name", () => (form.elements.namedItem("name") as HTMLInputElement).value.trim().length >= 3],
-      ["email", () => (form.elements.namedItem("email") as HTMLInputElement).validity.valid],
-      ["age", () => (form.elements.namedItem("age") as HTMLInputElement).checked],
-      ["terms", () => (form.elements.namedItem("terms") as HTMLInputElement).checked],
-    ];
-    let tried = false;
-    const validate = () => {
-      let first: HTMLInputElement | undefined;
-      for (const [key, ok] of checks) {
-        const input = form.elements.namedItem(key) as HTMLInputElement;
-        const bad = !ok();
-        input.setAttribute("aria-invalid", String(bad));
-        $(`[data-error="${key}"]`).textContent = bad ? copy.errors[key] : "";
-        if (bad && !first) first = input;
-      }
-      return first;
-    };
-    form.addEventListener("input", () => tried && validate());
-    form.addEventListener("change", () => tried && validate());
-
-    // Order number, numeric so it works as the bank's variable symbol
-    const makeRef = () => {
-      const a = new Uint32Array(1);
-      crypto.getRandomValues(a);
-      return String(10000000 + (a[0] % 90000000));
-    };
-
-    const busy = (on: boolean) => {
-      $<HTMLButtonElement>("[data-submit]").disabled = on;
-      $("[data-submit-idle]").classList.toggle("hidden", on);
-      $("[data-submit-busy]").classList.toggle("hidden", !on);
-    };
+    const input = (k: string) => form.elements.namedItem(k) as HTMLInputElement;
+    const validate = validation(
+      root,
+      form,
+      [
+        { key: "name", ok: () => input("name").value.trim().length >= 3, field: () => input("name") },
+        { key: "email", ok: () => input("email").validity.valid, field: () => input("email") },
+        { key: "age", ok: () => input("age").checked, field: () => input("age") },
+        { key: "terms", ok: () => input("terms").checked, field: () => input("terms") },
+      ],
+      copy.errors,
+    );
 
     const finish = (ref: string, mail?: { href: string; body: string }) => {
-      form.hidden = true;
-      done.hidden = false;
       setStep(3);
       $("[data-done-ref]").textContent = `#${ref}`;
       $("[data-done-state]").textContent = mail ? (cs ? "Připraveno k odeslání" : "Ready to send") : cs ? "Přijato" : "Received";
@@ -522,19 +452,17 @@ const field = "field mt-2 block w-full";
           }
         });
       }
-      done.focus();
-      done.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+      showDone(form, done);
     };
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      tried = true;
       const bad = validate();
       if (bad) return bad.focus();
 
       const n = sync();
-      const v = (k: string) => ((form.elements.namedItem(k) as HTMLInputElement).value || "").trim();
-      const ref = makeRef();
+      const v = (k: string) => (input(k).value || "").trim();
+      const ref = orderRef();
       const order = {
         ref,
         event: d.event,
@@ -568,28 +496,14 @@ const field = "field mt-2 block w-full";
       ].join("\n");
 
       if (d.endpoint) {
-        busy(true);
-        $('[data-error="send"]').textContent = "";
-        try {
-          const res = await fetch(d.endpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Accept: "application/json" },
-            body: JSON.stringify(order),
-          });
-          if (!res.ok) throw new Error(String(res.status));
-          finish(ref);
-        } catch {
-          $('[data-error="send"]').textContent = cs
-            ? `Objednávku se nepodařilo odeslat. Zkus to znovu, nebo nám napiš na ${d.email}.`
-            : `The order did not go through. Try again, or write to us at ${d.email}.`;
-        } finally {
-          busy(false);
-        }
+        const fail = cs
+          ? `Objednávku se nepodařilo odeslat. Zkus to znovu, nebo nám napiš na ${d.email}.`
+          : `The order did not go through. Try again, or write to us at ${d.email}.`;
+        if (await postOrder(root, d.endpoint, order, fail)) finish(ref);
         return;
       }
 
-      const href = `mailto:${d.email}?subject=${encodeURIComponent(`${copy.subject}, ${d.wave}, ${n}× [${ref}]`)}&body=${encodeURIComponent(body)}`;
-      location.href = href;
+      const href = mailOrder(d.email!, `${copy.subject}, ${d.wave}, ${n}× [${ref}]`, body);
       finish(ref, { href, body });
     });
   }

@@ -1,8 +1,11 @@
 ---
 /**
- * Feeds pointer position into CSS on every `[data-pointer]` element, for hero effects:
- *   --x / --y    pointer in px inside the element (footer lens)
+ * Feeds pointer position into CSS for hero effects, measured on every `[data-pointer]` element:
+ *   --x / --y    pointer in px inside the element (peek lens)
  *   --px / --py  pointer from -1 to 1 around the centre (depth, map steering)
+ * The vars are written only onto the descendants that read them (`[data-pointer-vars]`), not onto
+ * the hero itself: custom properties inherit, so setting them on the root restyled the whole hero
+ * every frame. With no marked descendant the root gets them, as before.
  * `data-active` is set while the pointer is inside. Fine pointers only; one rAF per frame.
  */
 ---
@@ -10,6 +13,9 @@
 <script>
   if (matchMedia("(pointer: fine)").matches) {
     document.querySelectorAll<HTMLElement>("[data-pointer]").forEach((el) => {
+      const marked = [...el.querySelectorAll<HTMLElement>("[data-pointer-vars]")];
+      const targets = marked.length ? marked : [el];
+      const set = (name: string, value: string) => targets.forEach((t) => t.style.setProperty(name, value));
       let raf = 0;
       let last: PointerEvent | null = null;
       const apply = () => {
@@ -18,10 +24,10 @@
         const r = el.getBoundingClientRect();
         const x = last.clientX - r.left;
         const y = last.clientY - r.top;
-        el.style.setProperty("--x", `${x}px`);
-        el.style.setProperty("--y", `${y}px`);
-        el.style.setProperty("--px", ((x / r.width) * 2 - 1).toFixed(3));
-        el.style.setProperty("--py", ((y / r.height) * 2 - 1).toFixed(3));
+        set("--x", `${x}px`);
+        set("--y", `${y}px`);
+        set("--px", ((x / r.width) * 2 - 1).toFixed(3));
+        set("--py", ((y / r.height) * 2 - 1).toFixed(3));
       };
       el.addEventListener("pointermove", (e) => {
         last = e;
@@ -30,8 +36,8 @@
       el.addEventListener("pointerenter", () => el.setAttribute("data-active", ""));
       el.addEventListener("pointerleave", () => {
         el.removeAttribute("data-active");
-        el.style.setProperty("--px", "0");
-        el.style.setProperty("--py", "0");
+        set("--px", "0");
+        set("--py", "0");
       });
     });
   }

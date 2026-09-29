@@ -27,7 +27,7 @@ const sommersAccent = "#a98bff";
     <Logo markOnly />
   </a>
 
-  <nav class="hidden flex-1 items-center gap-7 px-7 md:flex" aria-label="Main">
+  <nav class="hidden flex-1 items-center gap-5 px-6 whitespace-nowrap lg:flex xl:gap-7 xl:px-7" aria-label="Main">
     {
       nav.map((item) => (
         <a
@@ -60,7 +60,7 @@ const sommersAccent = "#a98bff";
       }
     </div>
 
-    <div class="hidden items-center gap-1 border-l border-line px-3 lg:flex">
+    <div class="hidden items-center gap-1 border-l border-line px-3 xl:flex">
       {
         site.socials.map((s) => (
           <a href={s.href} target="_blank" rel="noopener" class="grid size-11 place-items-center text-bone/75 transition-colors hover:text-acid" aria-label={s.label}>
@@ -71,13 +71,13 @@ const sommersAccent = "#a98bff";
     </div>
   </div>
 
-  <a href={cta.href} class="mono hidden h-full items-center justify-center bg-acid px-10 text-sm text-ink transition-colors hover:bg-bone md:flex lg:w-80">
+  <a href={cta.href} class="mono hidden h-full items-center justify-center bg-acid px-10 text-sm text-ink transition-colors hover:bg-bone md:flex xl:w-80">
     {cta.label}
   </a>
 
   <button
     id="menu-toggle"
-    class="grid w-15 place-items-center border-l border-line md:hidden"
+    class="grid w-15 place-items-center border-l border-line lg:hidden"
     aria-label={ui.openMenu[lang]}
     aria-expanded="false"
     aria-controls="mobile-menu"
@@ -87,7 +87,7 @@ const sommersAccent = "#a98bff";
     <Icon name="list" class="size-6" />
   </button>
 
-  <div id="mobile-menu" class="fixed inset-x-0 top-15 bottom-0 hidden overflow-y-auto bg-ink md:hidden">
+  <div id="mobile-menu" class="fixed inset-x-0 top-15 bottom-0 hidden overflow-y-auto bg-ink lg:hidden">
     <nav class="flex flex-col px-4 py-6" aria-label="Mobile">
       {
         nav.map((item) => (

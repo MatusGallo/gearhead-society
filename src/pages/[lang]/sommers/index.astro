@@ -10,7 +10,8 @@ import ScanField from "../../../components/ScanField.astro";
 import SectionHeading from "../../../components/SectionHeading.astro";
 import SommersCard from "../../../components/SommersCard.astro";
 import EditionMark from "../../../components/EditionMark.astro";
-import { editionLabel, formatRange, pastEditions, sommers, upcomingEditions } from "../../../data/sommers";
+import SommersPodcast from "../../../components/SommersPodcast.astro";
+import { editionLabel, formatRange, sommers, upcomingEditions } from "../../../data/sommers";
 import { dissolve } from "../../../data/dissolve";
 import { href, langPaths, translator, ui, type Lang } from "../../../i18n";
 
@@ -19,10 +20,9 @@ const lang = Astro.params.lang as Lang;
 const t = translator(lang);
 
 const upcoming = upcomingEditions();
-const past = pastEditions();
-// Past editions come in pages of one desktop row; the rest load on request
-const pageSize = 3;
 const next = upcoming[0];
+// The current meetup is featured above; the list below holds up to two after it, once announced
+const later = upcoming.slice(1);
 const mailto = (subject: string) => `mailto:${sommers.email}?subject=${encodeURIComponent(subject)}`;
 const register = t({ cs: "Registrace", en: "Register" });
 // Meetups start on Friday afternoon; setkání without a number show their date instead
@@ -69,7 +69,7 @@ const readout = next
       {
         next && (
           <>
-            <span class="display outline-num pointer-events-none absolute -top-[0.08em] right-[-0.04em] text-[clamp(12rem,38vw,34rem)] !leading-[0.8] select-none" aria-hidden="true">
+            <span data-pointer-vars class="display outline-num pointer-events-none absolute -top-[0.08em] right-[-0.04em] text-[clamp(12rem,38vw,34rem)] !leading-[0.8] select-none" aria-hidden="true">
               <span class="title-in block" style="--i:2">{big}</span>
             </span>
           </>
@@ -84,7 +84,7 @@ const readout = next
           </p>
           <div class="mt-7 flex flex-wrap gap-3" style="--i:4">
             {next && <a href={mailto(`${register}: ${editionLabel(next, lang)}`)} class="btn btn-acid">{register} <Icon name="envelope-simple" /></a>}
-            <a href="#edice" class="btn btn-ghost bg-ink/75">{t({ cs: "Všechny edice", en: "All editions" })}</a>
+            {later.length > 0 && <a href="#edice" class="btn btn-ghost bg-ink/75">{t({ cs: "Další termíny", en: "Next dates" })}</a>}
           </div>
         </div>
       </div>
@@ -181,44 +181,20 @@ const readout = next
     </div>
   </section>
 
-  <!-- EDITIONS -->
-  <section id="edice" class="mx-auto max-w-[1400px] scroll-mt-24 px-4 pb-24 sm:px-6">
-    {
-      upcoming.length > 0 && (
-        <>
-          <SectionHeading title={t({ cs: "Nadcházející", en: "Upcoming" })} />
-          <div class="mb-24 grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
-            {upcoming.map((e) => <SommersCard edition={e} lang={lang} />)}
-          </div>
-        </>
-      )
-    }
-    <SectionHeading title={t({ cs: "Proběhlé edice", en: "Past editions" })} />
-    <div data-more={pageSize}>
-      <div class="grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
-        {past.map((e, i) => (
-          <div data-more-item hidden={i >= pageSize}>
-            <SommersCard edition={e} lang={lang} past />
-          </div>
-        ))}
-      </div>
-      {
-        past.length > pageSize && (
-          <div class="mt-12 flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <p class="mono text-xs text-bone/60" aria-live="polite">
-              {t({ cs: "Zobrazeno", en: "Showing" })} <span data-more-count>{pageSize}</span> / {past.length}
-            </p>
-            <button type="button" data-more-button class="more-btn mono group relative inline-flex items-center gap-3 overflow-hidden border border-acid px-6 py-4 text-sm text-acid transition-colors hover:bg-acid hover:text-ink">
-              <Icon name="plus" class="size-4 transition-transform duration-300 group-hover:rotate-90" />
-              <span class="more-idle">{t({ cs: "Načíst starší edice", en: "Load older editions" })}</span>
-              <span class="more-busy">{t({ cs: "Načítám", en: "Loading" })}</span>
-              <span class="more-bar" aria-hidden="true"></span>
-            </button>
-          </div>
-        )
-      }
-    </div>
-  </section>
+  <!-- NEXT EDITIONS: at most two after the current meetup, Sommers keeps no archive -->
+  {
+    later.length > 0 && (
+      <section id="edice" class="mx-auto max-w-[1400px] scroll-mt-24 px-4 pb-24 sm:px-6">
+        <SectionHeading title={t({ cs: "Nadcházející", en: "Upcoming" })} />
+        <div class="grid gap-x-5 gap-y-10 sm:grid-cols-2">
+          {later.map((e) => <SommersCard edition={e} lang={lang} />)}
+        </div>
+      </section>
+    )
+  }
+
+  <!-- PODCAST -->
+  <SommersPodcast lang={lang} />
 
   <!-- CONTACT -->
   <section class="bg-coal">
@@ -230,28 +206,3 @@ const readout = next
   </section>
 </Layout>
 
-<script>
-  // Reveals the next page of past editions after a short loading beat (skipped under reduced motion)
-  for (const root of document.querySelectorAll<HTMLElement>("[data-more]")) {
-    const step = Number(root.dataset.more) || 3;
-    const button = root.querySelector<HTMLButtonElement>("[data-more-button]");
-    const count = root.querySelector("[data-more-count]");
-    const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    button?.addEventListener("click", () => {
-      if (button.dataset.state === "busy") return;
-      button.dataset.state = "busy";
-      setTimeout(() => {
-        const hidden = [...root.querySelectorAll<HTMLElement>("[data-more-item][hidden]")];
-        hidden.slice(0, step).forEach((el, i) => {
-          el.style.setProperty("--i", String(i));
-          el.classList.add("load-in");
-          el.hidden = false;
-        });
-        const shown = root.querySelectorAll("[data-more-item]:not([hidden])").length;
-        if (count) count.textContent = String(shown);
-        delete button.dataset.state;
-        if (hidden.length <= step) button.remove();
-      }, still ? 0 : 750);
-    });
-  }
-</script>

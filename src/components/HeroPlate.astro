@@ -13,9 +13,10 @@
 import Icon from "./Icon.astro";
 import Pointer from "./Pointer.astro";
 import Visual from "./Visual.astro";
+import type { Photo } from "../data/placeholder";
 
 interface Props {
-  src: string;
+  src: Photo;
   alt?: string;
   tone?: "acid" | "violet";
   /** CSS object-position for the crop, as "x% y%" */
@@ -36,7 +37,7 @@ const pos = "calc(var(--fx) * 100%) calc(var(--fy) * 100%)";
 ---
 
 <div class="hero-plate absolute inset-0 overflow-hidden [container-type:size]" style={crop}>
-  <Visual src={src} alt={alt} tone={tone} fx={scanlines ? ["lines", "grain"] : ["grain"]} loading="eager" focus={pos} imgClass="hp-depth" class="plate-fade !absolute inset-0" />
+  <Visual src={src} alt={alt} tone={tone} fx={scanlines ? ["lines", "grain"] : ["grain"]} loading="eager" priority focus={pos} imgClass="hp-depth" class="plate-fade !absolute inset-0" />
   <Visual src={src} tone="violet" loading="eager" focus={pos} imgClass="hp-depth" class="hp-ghost !absolute inset-0" />
   <div class="hp-depth absolute inset-0" aria-hidden="true">
     <div class="hp-map"><slot /></div>

@@ -1,0 +1,174 @@
+---
+/**
+ * Waiting list counter: a stack of generated call-sign tiles (seeded 5x5 pixel glyphs, never photos of people) and
+ * the real sign-up count on an odometer. The tiles deal in from the left once it is in view, then the digits roll up.
+ * When the visitor joins (Waitlist.astro calls `join()` via the `wl:joined` event), their own tile pops onto the
+ * front and the count ticks up by one. Not rendered without a real count. `size="lg"` for the waiting-list hero.
+ */
+import Icon from "./Icon.astro";
+import { translator, type Lang } from "../i18n";
+
+interface Props {
+  count: number;
+  seed: number;
+  lang: Lang;
+  size?: "md" | "lg";
+  class?: string;
+}
+
+const { count, seed, lang, size = "md", class: cls } = Astro.props;
+const lg = size === "lg";
+const tileSize = lg ? "size-12" : "size-9";
+const t = translator(lang);
+
+// mulberry32: the same tiles on every build for the same event
+const rand = (s: number) => () => {
+  s = (s + 0x6d2b79f5) | 0;
+  let x = Math.imul(s ^ (s >>> 15), 1 | s);
+  x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+  return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+};
+const r = rand(seed * 977);
+// Mirrored 5x5 glyph: three columns decide, two mirror
+const glyph = () => {
+  const on: [number, number][] = [];
+  for (let y = 0; y < 5; y++)
+    for (let x = 0; x < 3; x++)
+      if (r() > 0.5) {
+        on.push([x, y]);
+        if (x < 2) on.push([4 - x, y]);
+      }
+  return on;
+};
+const tones = ["bg-coal text-acid", "bg-acid text-ink", "bg-violet text-acid", "bg-steel text-bone", "bg-coal text-bone"];
+const tiles = [...Array(Math.min(5, count)).keys()].map((i) => ({ cells: glyph(), tone: tones[i % tones.length] }));
+
+// One more wheel than the count needs, so a join that adds a digit (99 to 100) has a wheel to roll in
+const width = String(count + 1).length;
+const digits = String(count).padStart(width, "0");
+const label = t({ cs: "na seznamu", en: "on the list" });
+---
+
+<div class:list={["wc flex items-center", lg ? "wc-lg gap-4" : "gap-3", cls]} data-wait-count data-count={count}>
+  <span class="wc-stack flex" aria-hidden="true" data-wc-stack>
+    <span class:list={["wc-tile wc-me hidden place-items-center border-2 border-ink bg-acid text-ink", tileSize]} data-wc-me>
+      <Icon name="check" class="size-4" />
+    </span>
+    {
+      tiles.map((tile, i) => (
+        <span class:list={["wc-tile grid place-items-center border-2 border-ink", tileSize, tile.tone]} style={`--i:${i};z-index:${10 - i}`}>
+          <svg viewBox="0 0 5 5" class={lg ? "size-6" : "size-5"} shape-rendering="crispEdges">
+            {tile.cells.map(([x, y]) => <rect x={x} y={y} width="1" height="1" fill="currentColor" />)}
+          </svg>
+        </span>
+      ))
+    }
+  </span>
+  <span class="flex items-stretch border border-line bg-coal">
+    <span class:list={["wc-num display flex bg-bone leading-none text-ink tabular-nums", lg ? "items-center px-3 py-2 text-2xl" : "px-2 py-1.5 text-base"]} aria-hidden="true" data-wc-num>
+      {
+        [...digits].map((d, i) => (
+          <span class="wc-wheel" style={`--n:${d};--i:${i}`} data-lead={i < width - String(count).length ? "" : undefined}>
+            <span class="wc-strip">{[...Array(10).keys()].map((k) => <span>{k}</span>)}</span>
+          </span>
+        ))
+      }
+    </span>
+    <span class:list={["mono flex items-center text-bone/80", lg ? "px-4 text-xs" : "px-3 text-[0.7rem]"]}>{label}</span>
+  </span>
+  <span class="sr-only" aria-live="polite" data-wc-sr>{count} {label}</span>
+</div>
+
+<style>
+  /* Tiles overlap by a third; the stack pads the first overlap back in */
+  .wc-stack { padding-left: 0.6rem; }
+  .wc-tile { margin-left: -0.6rem; }
+  .wc-lg .wc-stack { padding-left: 0.8rem; }
+  .wc-lg .wc-tile { margin-left: -0.8rem; }
+  .wc-me:not(.hidden) { display: grid; z-index: 20; }
+
+  .wc-wheel {
+    display: block;
+    height: 1em;
+    overflow: hidden;
+  }
+  /* A leading zero kept for a join that adds a digit stays folded away until then */
+  .wc-wheel[data-lead] { width: 0; }
+  .wc-strip {
+    display: flex;
+    flex-direction: column;
+    transform: translateY(calc(var(--n) * -1em));
+  }
+  .wc-strip > span {
+    height: 1em;
+    line-height: 1;
+  }
+
+  @keyframes wc-deal {
+    from { opacity: 0; transform: translateX(-120%) rotate(-8deg); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes wc-roll {
+    from { transform: translateY(0); }
+  }
+  @keyframes wc-pop {
+    0% { opacity: 0; transform: scale(0.3); }
+    60% { opacity: 1; transform: scale(1.18); }
+    100% { transform: none; }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    /* Once in view (data-in, set by the script; a scroll timeline never finishes in the sticky aside): tiles deal
+       from the left one after another, then the odometer rolls up to the count. Hidden until then, but only with
+       JavaScript on (.wc-armed), so without it the counter just stands there. */
+    .wc-armed:not([data-in]) .wc-tile:not(.wc-me) { opacity: 0; }
+    .wc-armed:not([data-in]) .wc-strip { transform: none; }
+    [data-in] .wc-tile {
+      animation: wc-deal 0.6s var(--ease-out-expo) both;
+      animation-delay: calc(var(--i, 0) * 90ms);
+    }
+    [data-in] .wc-strip {
+      animation: wc-roll 1.4s var(--ease-out-expo) both;
+      animation-delay: calc(var(--i, 0) * 140ms + 350ms);
+    }
+    /* After a join the scroll animation hands over to a transition, so the new count rolls from the old one */
+    [data-joined] .wc-strip {
+      animation: none;
+      transition: transform 0.9s var(--ease-out-expo);
+    }
+    [data-joined] .wc-me { animation: wc-pop 0.55s var(--ease-out-expo) both; }
+  }
+</style>
+
+<script>
+  // Waitlist.astro fires `wl:joined` on its root once a sign-up went through
+  document.querySelectorAll<HTMLElement>("[data-wait-count]").forEach((root) => {
+    root.classList.add("wc-armed");
+    const io = new IntersectionObserver(([e]) => {
+      if (!e.isIntersecting) return;
+      root.dataset.in = "";
+      io.disconnect();
+    }, { threshold: 0.6 });
+    io.observe(root);
+    const host = root.closest("[data-waitlist]");
+    host?.addEventListener("wl:joined", () => {
+      if (root.dataset.joined != null) return;
+      const n = Number(root.dataset.count) + 1;
+      const wheels = [...root.querySelectorAll<HTMLElement>(".wc-wheel")];
+      const digits = String(n).padStart(wheels.length, "0");
+      root.dataset.joined = "";
+      root.querySelector("[data-wc-me]")!.classList.remove("hidden");
+      // Next frame: the strips now sit on the old count without the animation, so the change transitions
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          wheels.forEach((w, i) => {
+            w.style.setProperty("--n", digits[i]);
+            if (i >= wheels.length - String(n).length) w.removeAttribute("data-lead");
+          });
+          const sr = root.querySelector("[data-wc-sr]")!;
+          sr.textContent = sr.textContent!.replace(/^\d+/, String(n));
+        }),
+      );
+    });
+  });
+</script>

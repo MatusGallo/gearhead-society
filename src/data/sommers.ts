@@ -1,4 +1,5 @@
 import { locale, type L, type Lang } from "../i18n";
+import { ph, type Photo } from "./placeholder";
 
 const b = (cs: string, en: string): L => ({ cs, en });
 const bl = (cs: string[], en: string[]): L<string[]> => ({ cs, en });
@@ -7,6 +8,87 @@ export const sommers = {
   name: "Sommers",
   email: "Sommers-srazy@post.cz",
   hosts: "Sommers, Iglite, Magnas",
+  /**
+   * Sommers podcast on Spotify (SommersPodcast.astro): one series, newest episode first. The page features the latest
+   * one and lists the rest on request. An episode's player is embedded only after a click, as Spotify sets its own
+   * cookies. `demo: true` renders the mock episodes and producer below and never contacts Spotify.
+   * TODO: replace them with the real ones (`url` = https://open.spotify.com/episode/<id>) and set `demo: false`.
+   */
+  podcast: {
+    demo: true,
+    /** Who makes the podcast for Sommers, credited with their socials */
+    producer: {
+      name: "Podcast Studio",
+      socials: [
+        { label: "Instagram", href: "https://instagram.com/", icon: "instagram-logo" },
+        { label: "Spotify", href: "https://open.spotify.com/", icon: "spotify-logo" },
+        { label: "YouTube", href: "https://youtube.com/", icon: "youtube-logo" },
+      ],
+    },
+    episodes: [
+      {
+        slug: "jak-vznika-sraz",
+        title: b("Jak vzniká sraz", "How a meetup comes together"),
+        text: b(
+          "Od výběru chaty po poslední úklid: co všechno stojí za jedním víkendem.",
+          "From picking the lodge to the last clean-up: everything behind one weekend.",
+        ),
+        date: "2026-09-12",
+        length: "48:20",
+        url: "https://open.spotify.com/",
+        cover: ph("comms"),
+      },
+      {
+        slug: "poprve-na-srazu",
+        title: b("Poprvé na srazu", "First time at a meetup"),
+        text: b(
+          "Co čekat, co si vzít a jak se neztratit mezi lidmi, které ještě neznáš.",
+          "What to expect, what to pack and how not to feel lost among people you have not met yet.",
+        ),
+        date: "2026-08-15",
+        length: "41:05",
+        url: "https://open.spotify.com/",
+        cover: ph("boots-row"),
+      },
+      {
+        slug: "souhlas",
+        title: b("Souhlas není formalita", "Consent is not a formality"),
+        text: b(
+          "Proč se ptáme a jak vypadá jasné ano v praxi.",
+          "Why we ask and what a clear yes looks like in practice.",
+        ),
+        date: "2026-07-18",
+        length: "52:47",
+        url: "https://open.spotify.com/",
+        cover: ph("harness"),
+      },
+      {
+        slug: "fetis-oblecky",
+        title: b("Fetiš oblečky", "Fetish outfits"),
+        text: b(
+          "Latex, kůže, gumáky i uniformy: jak začít a kde to sehnat.",
+          "Latex, leather, rubber boots and uniforms: how to start and where to find them.",
+        ),
+        date: "2026-06-20",
+        length: "38:12",
+        url: "https://open.spotify.com/",
+        cover: ph("reflective"),
+      },
+      {
+        slug: "tym-za-srazem",
+        title: b("Tým za srazem", "The team behind the meetup"),
+        text: b(
+          "Kdo vaří, kdo fotí a kdo drží pořádek, když ostatní tančí.",
+          "Who cooks, who shoots and who keeps order while everyone else dances.",
+        ),
+        date: "2026-05-23",
+        length: "45:36",
+        url: "https://open.spotify.com/",
+        cover: ph("team-backs"),
+      },
+    ] as PodcastEpisode[],
+  },
+
   intro: bl(
     [
       "Srazy jsou pořádány pro všechny fetišisty a BDSM pozitivní lidi bez rozdílu fetiše a zaměření, kteří se chtějí seznámit a pobavit se s podobně naladěnými přáteli. Akce je společenská, nikoliv „akční, erotická“. Fetiš oblečky jsou velmi vítány.",
@@ -53,6 +135,19 @@ export const sommers = {
       "Accommodation requires personal details, like any hotel or guesthouse (we are not sleeping in a forest clearing). Nobody gets in without accommodation details and a paid fee.",
     ],
   ),
+};
+
+export type PodcastEpisode = {
+  slug: string;
+  title: L;
+  text: L;
+  /** ISO date of release */
+  date: string;
+  length: string;
+  /** Spotify episode link, https://open.spotify.com/episode/<id> */
+  url?: string;
+  /** Square cover photo, toned violet on the page; greyscale gear shots like every other plate */
+  cover?: Photo;
 };
 
 export type DayBlock = { day: L; items: L<string[]> };
@@ -242,238 +337,49 @@ export const editions: SommersEdition[] = [
     sponsors: ["Cipissek", "Lykra"],
     seed: 49,
   },
+  // TODO: sample next editions until Sommers announces the real ones; dates, places and titles are placeholders
   {
-    slug: "oralni-odpoledne-tuklaty",
-    kind: "setkani",
-    title: b("Open Hangar", "Open Hangar"),
-    start: "2026-06-06",
-    place: b("Tuklaty, prostor za obecním úřadem", "Tuklaty, behind the municipal office"),
-    gps: [50.086, 14.769],
-    summary: b("Neformální odpolední pokec v Tuklatech. Výstavy, gulášování a občerstvení.", "An informal afternoon chat in Tuklaty. Exhibitions, goulash and refreshments."),
-    body: bl(
-      [
-        "Sejdeme se v sobotu 6. června v Tuklatech v prostoru za obecním úřadem. Čas není přesně stanovený, ale budeme tam mezi třináctou a osmnáctou hodinou. Tak kdo chcete, přijďte za námi na pokec.",
-        "Parkovat auto se dá u kostela, který je poblíž, nebo přímo před OÚ.",
-        "V ten den v Tuklatech probíhají dvě výstavy. Uvidíte historické hornické předměty a výstroj do ČS stíhaček. Vstupné je dobrovolné. V areálu bude gulášování a další zábavné atrakce a ukázky. Dá se tam koupit občerstvení, jídlo i nápoje.",
-        "Na Open Hangar se prosím zaregistrujte mailem na Sommers-srazy@post.cz.",
-        "Děkuji za účast. Bylo to moc fajn setkání.",
-      ],
-      [
-        "We meet on Saturday 6 June in Tuklaty, behind the municipal office. No fixed time, but we will be there between 13:00 and 18:00. Come and join us for a chat.",
-        "You can park by the church nearby or right in front of the municipal office.",
-        "Two exhibitions run in Tuklaty that day: historic mining equipment and Czechoslovak fighter-pilot gear. Admission is voluntary. There will be a goulash cook-off, other attractions and demonstrations, and food and drinks to buy.",
-        "Please register for Open Hangar by e-mail at Sommers-srazy@post.cz.",
-        "Thank you for coming. It was a really lovely meetup.",
-      ],
-    ),
-    seed: 606,
-  },
-  {
-    slug: "48-sraz-berounkovani-po-nasem",
+    slug: "50-sraz",
     kind: "sraz",
-    number: 48,
-    title: b("River Camp", "River Camp"),
-    start: "2026-05-29",
-    end: "2026-05-31",
-    place: b("Řevnice u Prahy", "Řevnice near Prague"),
-    gps: [49.914, 14.236],
-    price: b("1 590 Kč", "1,590 CZK"),
-    capacity: b("78 osob", "78 people"),
-    summary: b("Jarní sraz v rekreačním areálu u řeky. Chatky, Bazárek, špekáčkování a soutěž.", "A spring meetup at a riverside holiday site. Cabins, a swap market, a sausage roast and a contest."),
-    team,
-    accommodation: bl(
-      [
-        "Příjezd do areálu je možný od 15:00 hodin.",
-        "Ubytování je zajištěno v rekreačním areálu u řeky ve čtyř-, pěti- a šestilůžkových chatkách. Kapacita areálu je 78 osob. O počtu účastníků nerozhoduje registrace, ale zaplacení účastnického poplatku.",
-        "Přesnou adresu obdržíš na základě zaplacení účastnického poplatku 1 590 Kč, několik dnů před akcí. V této ceně je ubytování na dvě noci, veškeré jídlo od páteční večeře do nedělní snídaně včetně a špekáčkování. Po celou dobu pobytu je k dispozici káva, čaj, mléko, kakao, limo, voda a buchty.",
-        "Naše srazy jsou bez personálu, proto se všichni srazující obsluhují sami a též po sobě sami uklízejí. Je NUTNÉ si s sebou vzít povlečení a prostěradlo.",
-        "Na srazu bude k dispozici točené pivo (Kozel 11°), půllitr za 30 Kč. Alkohol si můžeš dovézt i svůj. Pokud budeš pít pivo, vezmi si prosím s sebou vlastní půllitr.",
-      ],
-      [
-        "Arrival at the site from 15:00.",
-        "Accommodation is in four-, five- and six-bed cabins at a riverside holiday site that holds 78 people. Places go to those who have paid the fee, not to those who registered.",
-        "You get the exact address a few days before the event, once you have paid the 1,590 CZK fee. It covers two nights, all meals from Friday dinner to Sunday breakfast and the sausage roast. Coffee, tea, milk, cocoa, lemonade, water and cakes are available the whole time.",
-        "Our meetups have no staff, so everyone serves themselves and cleans up after themselves. You MUST bring your own bed linen and sheet.",
-        "Draught beer (Kozel 11°) is available at 30 CZK a pint. You can bring your own alcohol. If you drink beer, please bring your own pint glass.",
-      ],
-    ),
-    menuNote: b("Diety prosím hlaste předem.", "Please report dietary needs in advance."),
-    menu: [
-      { day: day.friDinner, items: bl(["knedlíčková polévka s nudlemi", "pečená krkovice, vařené brambory, špenát"], ["dumpling soup with noodles", "roast pork neck, boiled potatoes, spinach"]) },
-      {
-        day: day.satBreakfast,
-        items: bl(
-          ["paštika, máslo, salám suchý, měkký, sýr plátky, sýr k namazání", "jogurt bílý, ovocný, marmeláda, med, müsli, cornflakes", "rohlíky, chleba, buchty"],
-          ["pâté, butter, dry and soft salami, sliced cheese, cream cheese", "plain and fruit yoghurt, jam, honey, muesli, cornflakes", "rolls, bread, cakes"],
-        ),
-      },
-      {
-        day: day.satLunch,
-        items: bl(
-          ["hovězí vývar s nudlemi", "svíčková na smetaně, houskový knedlík", "odpoledne opékání špekáčků na ohni"],
-          ["beef broth with noodles", "svíčková (beef in cream sauce), bread dumplings", "afternoon sausage roast over the fire"],
-        ),
-      },
-      { day: day.satDinner, items: bl(["vepřová kotleta na slanině, rýže"], ["pork chop with bacon, rice"]) },
-      {
-        day: day.sunBreakfast,
-        items: bl(
-          ["paštika, máslo, salám suchý, měkký, sýr plátky, sýr k namazání", "jogurt bílý, ovocný, marmeláda, med, müsli, cornflakes", "rohlíky, chleba, buchty"],
-          ["pâté, butter, dry and soft salami, sliced cheese, cream cheese", "plain and fruit yoghurt, jam, honey, muesli, cornflakes", "rolls, bread, cakes"],
-        ),
-      },
-    ],
-    programIntro: bl(
-      [
-        "Pro hravé účastníky je přichystána soutěž a další aktivity, jejichž podrobný popis rozešlu mailem. Povinného není nic, jen časy k jídlu a dresscode na společné foto.",
-        "V areálu máme k dispozici menší místnost, ve které v sobotu proběhne Bazárek, po zbytek pobytu ji budeme používat jako hernu a pro všechny v ní platí pravidla bezpečnosti BDSM.",
-      ],
-      [
-        "A contest and other activities are ready for playful guests; details go out by e-mail. Nothing is compulsory except meal times and the dress code for the group photo.",
-        "A smaller room on site hosts the swap market on Saturday; the rest of the stay it is our playroom, and the BDSM safety rules apply to everyone in it.",
-      ],
-    ),
-    schedule: [
-      { day: day.fri, items: bl(["příjezd od 15 hodin", "19:00 večeře", "dle zájmu taneček, volná zábava"], ["arrival from 15:00", "19:00 dinner", "dancing if you like, free time"]) },
-      {
-        day: day.sat,
-        items: bl(
-          ["po probuzení snídaně", "11:00-13:00 Bazárek", "14:00 oběd", "15:30 soutěž", "opékání špekáčků", "19:00 večeře", "20:30 společné foto", "vyhlášení výherců soutěže", "pasování nováčků", "dle zájmu taneček, volná zábava"],
-          ["breakfast when you wake up", "11:00-13:00 swap market", "14:00 lunch", "15:30 contest", "sausage roast", "19:00 dinner", "20:30 group photo", "contest winners announced", "newcomer initiation", "dancing if you like, free time"],
-        ),
-      },
-      {
-        day: day.sun,
-        items: bl(
-          ["po probuzení snídaně", "úklid chatek, společenské místnosti a kuchyně", "do 12 hodin loučení a rozjezd k domovům"],
-          ["breakfast when you wake up", "clean-up of cabins, common room and kitchen", "goodbyes and departure by 12:00"],
-        ),
-      },
-    ],
-    other: {
-      cs: [
-        "V chatkách je přísný zákaz kouření. Kouřit se smí pouze ve vyhrazeném prostoru.",
-        "Do Řevnic se dostaneš pohodlně vlakem. Zastávka vlaku se nachází 1 km od areálu. V případě zájmu zajistím odvoz z nádraží.",
-        carpool.cs,
-        "Změna programu a jídelníčku vyhrazena.",
-      ],
-      en: [
-        "Smoking is strictly forbidden in the cabins. Smoking only in the designated area.",
-        "Řevnice is easy to reach by train. The station is 1 km from the site; a pick-up from the station can be arranged.",
-        carpool.en,
-        "Programme and menu may change.",
-      ],
-    },
-    sponsors: ["Lykra", "RubberLTX", "Princezna", "Magnas"],
-    seed: 48,
-  },
-  {
-    slug: "jarni-vabeni-xii",
-    kind: "setkani",
-    title: b("Lookout XII", "Lookout XII"),
-    start: "2026-04-11",
-    place: b("Brno-Komín, rozhledna Holedná", "Brno-Komín, Holedná lookout tower"),
-    gps: [49.217, 16.515],
-    summary: b("Jarní procházka na rozhlednu Holedná a pozdní oběd v restauraci U Dvořáků.", "A spring walk to the Holedná lookout tower and a late lunch at U Dvořáků restaurant."),
-    body: bl(
-      [
-        "Sešli jsme se v sobotu 11. dubna 2026 ve 12 hodin v Brně-Komíně na břehu řeky Svratky před budovou Sokola a šli jsme se pomalou procházkou podívat na Brno shora z rozhledny Holedná v Jundrově.",
-        "Na procházce nám vyhládlo, a tak následoval pozdní oběd v restauraci U Dvořáků v Brně-Komíně. Kdo nechtěl jít na procházku, přidal se až v restauraci.",
-        "Rodinní příslušníci a Quálíci jsou žádoucí, neboť akce je civilní.",
-      ],
-      [
-        "We met on Saturday 11 April 2026 at noon in Brno-Komín, on the bank of the Svratka in front of the Sokol building, and took a slow walk up to the Holedná lookout tower in Jundrov to see Brno from above.",
-        "The walk made us hungry, so a late lunch followed at U Dvořáků in Brno-Komín. Those who skipped the walk joined us at the restaurant.",
-        "Family members and non-kinky friends are welcome, as this is a plain-clothes event.",
-      ],
-    ),
-    seed: 411,
-  },
-  {
-    slug: "47-sraz-radostne-vanoce-a-rozverny-silvestr",
-    kind: "sraz",
-    number: 47,
-    title: b("Zero Hour", "Zero Hour"),
-    start: "2026-02-06",
-    end: "2026-02-08",
+    number: 50,
+    title: b("Cold Start", "Cold Start"),
+    start: "2027-02-05",
+    end: "2027-02-07",
     place: destne,
     gps: destneGps,
-    price: b("1 890 Kč", "1,890 CZK"),
     capacity: b("100 lidí", "100 people"),
     summary: b(
-      "Zimní sraz v duchu Vánoc a silvestra: Dárečkování, soutěž Chlebíčkování a silvestrovská půlnoc.",
-      "A winter meetup in the spirit of Christmas and New Year's Eve: a gift swap, an open-sandwich contest and a midnight toast.",
+      "Jubilejní padesátý sraz, zimní víkend v horské chatě v Orlických horách. Cenu, jídelníček a program rozešleme s mailem k platbě.",
+      "The fiftieth meetup, a winter weekend in a mountain lodge in the Orlické Mountains. Price, menu and programme follow in the payment e-mail.",
     ),
     team,
-    accommodation: bl(
-      [
-        "Příjezd do areálu je možný od 15 hodin.",
-        "Ubytování pro 50 lidí je zajištěno v pokojích v patře horské chaty, další v apartmánu nebo bungalovech po 5 až 12 lidech. Kapacita areálu je 100 lidí.",
-        "V ceně 1 890 Kč je ubytování na dvě noci, jídlo od páteční večeře do nedělní snídaně včetně, buchty a nealko nápoje, vánoční cukroví, silvestrovský přípitek a dva chlebíčky.",
-      ],
-      [
-        "Arrival at the site from 15:00.",
-        "Rooms for 50 people are on the upper floor of the lodge, more in an apartment or bungalows for 5 to 12 people. The site holds 100 people.",
-        "The 1,890 CZK fee covers two nights, meals from Friday dinner to Sunday breakfast, cakes and soft drinks, Christmas cookies, a New Year's toast and two open sandwiches.",
-      ],
-    ),
-    menuNote: b(
-      "Diety prosím hlaste předem. Do registračního e-mailu napište výběr páteční večeře.",
-      "Please report dietary needs in advance and include your Friday dinner choice in the registration e-mail.",
-    ),
-    menu: [
-      {
-        day: day.friDinner,
-        items: bl(
-          ["polévka rybí nebo hrášková, obě s rohlíkovými krutony", "smažený řízek: kapr, kuřecí prsa nebo vepřová krkovice", "bramborový salát nebo vařené brambory, kompot, zelenina"],
-          ["fish or pea soup, both with croutons", "breaded schnitzel: carp, chicken breast or pork neck", "potato salad or boiled potatoes, compote, vegetables"],
-        ),
-      },
-      { day: day.satLunch, items: bl(["masový vývar", "kuřecí prsa na žampionech, rýže"], ["meat broth", "chicken breast with mushrooms, rice"]) },
-      { day: day.satDinner, items: bl(["pečené vepřové maso, houskový knedlík, špenát"], ["roast pork, bread dumplings, spinach"]) },
-    ],
-    programIntro: bl(
-      ["Tímto srazem nás provázel duch Vánoc a silvestra. Jednu chatku jsme využívali jako hernu."],
-      ["This meetup was all about Christmas and New Year's Eve. One cabin served as our playroom."],
-    ),
-    schedule: [
-      {
-        day: b("Pátek 6. února: Vánoce", "Friday 6 February: Christmas"),
-        items: bl(
-          ["příjezd od 15:00", "19:00 společná večeře, oblečky vítány", "po večeři Dárečkování", "volná zábava, dle zájmu taneček"],
-          ["arrival from 15:00", "19:00 dinner together, outfits welcome", "gift swap after dinner", "free time, dancing if you like"],
-        ),
-      },
-      {
-        day: b("Sobota 7. února: silvestr", "Saturday 7 February: New Year's Eve"),
-        items: bl(
-          ["po probuzení snídaně", "14:00 oběd", "15:30 soutěž Chlebíčkování", "19:00 večeře", "20:30 společné foto", "vyhlášení výherců", "pasování nováčků", "24:00 silvestrovská půlnoc při přípitku, hymně a tanečku"],
-          ["breakfast when you wake up", "14:00 lunch", "15:30 open-sandwich contest", "19:00 dinner", "20:30 group photo", "winners announced", "newcomer initiation", "24:00 midnight with a toast, the anthem and a dance"],
-        ),
-      },
-      {
-        day: b("Neděle 8. února", "Sunday 8 February"),
-        items: bl(
-          ["po probuzení snídaně", "úklid ubytovacích a společných prostor", "do 12 hodin loučení a rozjezd k domovům"],
-          ["breakfast when you wake up", "clean-up of rooms and shared spaces", "goodbyes and departure by 12:00"],
-        ),
-      },
-    ],
-    extras: [
-      {
-        title: b("Dárečkování", "Gift swap"),
-        text: b(
-          "Dobrovolná aktivita, při které účastníci obdarují ostatní srazující malinkou pozorností v ceně 10 až 15 Kč za dárek. Kdo dárky donese, ten i dárky dostane. Jde o princip Vánoc, ne o zruinování.",
-          "A voluntary activity where guests give each other tiny presents worth 10 to 15 CZK each. Whoever brings gifts gets gifts. It is about the spirit of Christmas, not about going broke.",
-        ),
-      },
-    ],
     other: {
-      cs: ["Celá chata, apartmány i bungalovy jsou striktně nekuřácké.", transportDestne.cs],
-      en: ["The whole lodge, apartments and bungalows are strictly non-smoking.", transportDestne.en],
+      cs: [transportDestne.cs, carpool.cs],
+      en: [transportDestne.en, carpool.en],
     },
-    sponsors: ["Lykra"],
-    seed: 47,
+    seed: 50,
+  },
+  {
+    slug: "jarni-vabeni-xiii",
+    kind: "setkani",
+    title: b("Lookout XIII", "Lookout XIII"),
+    start: "2027-04-10",
+    place: b("Brno-Komín, rozhledna Holedná", "Brno-Komín, Holedná lookout tower"),
+    gps: [49.217, 16.515],
+    summary: b("Jarní procházka na rozhlednu Holedná a pozdní oběd v Brně-Komíně.", "A spring walk to the Holedná lookout tower and a late lunch in Brno-Komín."),
+    body: bl(
+      [
+        "Sejdeme se v sobotu 10. dubna 2027 ve 12 hodin v Brně-Komíně na břehu řeky Svratky a pomalou procházkou dojdeme na rozhlednu Holedná v Jundrově.",
+        "Po procházce následuje pozdní oběd v restauraci v Brně-Komíně. Kdo nechce jít na procházku, přidá se až v restauraci.",
+        "Rodinní příslušníci a Quálíci jsou žádoucí, neboť akce je civilní. Přihlas se prosím mailem na Sommers-srazy@post.cz.",
+      ],
+      [
+        "We meet on Saturday 10 April 2027 at noon in Brno-Komín, on the bank of the Svratka, and take a slow walk up to the Holedná lookout tower in Jundrov.",
+        "A late lunch at a restaurant in Brno-Komín follows. If you would rather skip the walk, join us at the restaurant.",
+        "Family members and non-kinky friends are welcome, as this is a plain-clothes event. Please sign up by e-mail at Sommers-srazy@post.cz.",
+      ],
+    ),
+    seed: 410,
   },
 ];
 
@@ -488,9 +394,11 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 export const isUpcomingEdition = (e: SommersEdition) => (e.end ?? e.start) >= today();
 
-export const upcomingEditions = () => editions.filter(isUpcomingEdition).sort((a, b) => a.start.localeCompare(b.start));
-
-export const pastEditions = () => editions.filter((e) => !isUpcomingEdition(e)).sort((a, b) => b.start.localeCompare(a.start));
+/**
+ * Sommers lists only the current edition and at most two after it; one that is over drops off the site at the
+ * next build, and anything further out waits for a free slot
+ */
+export const upcomingEditions = () => editions.filter(isUpcomingEdition).sort((a, b) => a.start.localeCompare(b.start)).slice(0, 3);
 
 export const editionLabel = (e: SommersEdition, lang: Lang) =>
   e.number ? (lang === "cs" ? `${e.number}. sraz` : `Meetup ${e.number}`) : lang === "cs" ? "Setkání" : "Get-together";

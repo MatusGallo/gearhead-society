@@ -10,7 +10,7 @@ import TicketWaves from "../../../components/TicketWaves.astro";
 import Visual from "../../../components/Visual.astro";
 import { dissolve } from "../../../data/dissolve";
 import { hudVariant } from "../../../data/hud";
-import { currentWave, dateParts, formatNumeric, formatPrice, formatTime, nextEvent, ticketLink, upcomingEvents } from "../../../data/events";
+import { currentWave, dateParts, formatNumeric, formatPrice, formatTime, isWaitlist, nextEvent, ticketLink, upcomingEvents } from "../../../data/events";
 import { href, langPaths, translator, ui, type Lang } from "../../../i18n";
 
 export const getStaticPaths = langPaths;
@@ -44,21 +44,22 @@ const pad = (n: number) => String(n).padStart(2, "0");
         <ol class="hero-in mono mt-12 border-t border-bone/25 text-xs sm:text-sm">
           {list.map((e, i) => {
             const wave = currentWave(e);
-            const state = wave ? "live" : e.start && e.tickets.length ? "soon" : "tba";
+            const wait = isWaitlist(e);
+            const state = wave ? "live" : wait ? "wait" : e.start && e.tickets.length ? "soon" : "tba";
             return (
               <li style={`--i:${i + 4}`}>
                 <a href={`#${e.slug}`} class="group grid grid-cols-[3.25rem_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-bone/25 py-3 transition-colors hover:text-acid sm:grid-cols-[2.5rem_6rem_minmax(0,1fr)_minmax(0,14rem)_auto]">
                   <span class="hidden text-mute sm:block">{pad(i + 1)}</span>
-                  <span class="tabular-nums">{e.start ? formatNumeric(e.start, lang).slice(0, 6) : "TBA"}</span>
+                  <span class="tabular-nums">{e.start && !wait ? formatNumeric(e.start, lang).slice(0, 6) : "TBA"}</span>
                   <span class="display truncate text-base sm:text-2xl">{e.title}</span>
-                  <span class="hidden truncate text-mute sm:block">{e.venue[lang]}</span>
+                  <span class="hidden truncate text-mute sm:block">{wait ? "" : e.venue[lang]}</span>
                   <span
                     class:list={[
                       "px-2 py-1 text-[0.65rem] whitespace-nowrap sm:text-xs",
                       state === "live" ? "bg-acid text-ink" : "border border-line text-mute",
                     ]}
                   >
-                    {state === "live" ? `${wave!.name[lang]} ${formatPrice(wave!.price)}` : state === "soon" ? t({ cs: "Brzy v prodeji", en: "Coming soon" }) : "TBA"}
+                    {state === "live" ? `${wave!.name[lang]} ${formatPrice(wave!.price)}` : state === "wait" ? "Waiting list" : state === "soon" ? t({ cs: "Brzy v prodeji", en: "Coming soon" }) : "TBA"}
                   </span>
                 </a>
               </li>
@@ -73,13 +74,16 @@ const pad = (n: number) => String(n).padStart(2, "0");
     </div>
   </section>
 
-  <!-- LIST: one cargo record per date; the photo wipes open on scroll, a live sale gets the violet ticket block -->
+  <!-- LIST: one cargo record per date; the photo wipes open on scroll, a live sale gets the violet ticket block,
+       a date not on sale yet a button to its waiting list -->
   <section class="relative mx-auto max-w-[1400px] px-4 py-16 sm:px-6 lg:pl-24">
     <ContentRail label={ui.nav.events[lang]} />
     <ol class="border-b border-line">
       {
         list.map((e, i) => {
-          const d = dateParts(e.start, lang);
+          // A waiting-list event shows its name, edition and summary only: no date, venue or tickets yet
+          const wait = isWaitlist(e);
+          const d = dateParts(wait ? undefined : e.start, lang);
           const wave = currentWave(e);
           const buy = ticketLink(e, lang);
           const coords = e.location?.coords;
@@ -93,7 +97,7 @@ const pad = (n: number) => String(n).padStart(2, "0");
             <li id={e.slug} class="ev group relative scroll-mt-20 grid gap-x-10 gap-y-6 border-t border-line py-10 md:grid-cols-[6.5rem_minmax(0,1fr)_17rem]">
               <div class="flex items-baseline gap-3 md:block">
                 <span class="mono block text-xs text-mute">{pad(i + 1)} / {pad(list.length)}</span>
-                <span class="display mt-2 block text-5xl leading-none transition-colors group-hover:text-acid">{d.day}</span>
+                <span class:list={["display mt-2 block leading-none transition-colors group-hover:text-acid", wait ? "text-3xl" : "text-5xl"]}>{d.day}</span>
                 <span class="mono mt-1 block text-sm text-mute">{d.month} {d.weekday}</span>
               </div>
 
@@ -108,22 +112,22 @@ const pad = (n: number) => String(n).padStart(2, "0");
                 </h2>
                 <p class="mono mt-3 text-xs text-acid">{e.edition[lang]}</p>
                 <p class="mt-4 max-w-xl text-sm leading-relaxed text-bone/70">{e.summary[lang]}</p>
-                <dl class="boot-in mono mt-6 flex flex-wrap gap-x-8 gap-y-3 text-[0.7rem] leading-tight uppercase">
+                {!wait && <dl class="boot-in mono mt-6 flex flex-wrap gap-x-8 gap-y-3 text-[0.7rem] leading-tight uppercase">
                   {spec.map(([k, v], j) => (
                     <div style={`--i:${j}`}>
                       <dt class="text-mute">{k}</dt>
                       <dd class="mt-1 text-bone">{v}</dd>
                     </div>
                   ))}
-                </dl>
-                <TicketWaves event={e} lang={lang} class="mt-7" />
+                </dl>}
+                {!wait && <TicketWaves event={e} lang={lang} class="mt-7" />}
               </div>
 
               <div class="flex flex-col gap-4">
                 <div class="frame pointer-events-none">
                   <div class="wipe relative overflow-hidden" style={`--i:${i % 2}`}>
                     {e.image ? (
-                      <Visual src={e.image} alt="" tone="mono" hover="tone" fx={["lines"]} class="aspect-[16/10]" />
+                      <Visual src={e.image} sizes="(min-width: 1024px) 50vw, 100vw" alt="" tone="mono" hover="tone" fx={["lines"]} class="aspect-[16/10]" />
                     ) : (
                       <ScanField seed={e.seed} animate={false} labels={[]} class="aspect-[16/10]" />
                     )}
@@ -136,6 +140,10 @@ const pad = (n: number) => String(n).padStart(2, "0");
                       <span class="tix-box display bg-acid px-2 pt-1 pb-0.5 text-xl leading-none text-violet sm:text-2xl">{ui.buyTickets[lang]}</span>
                     </span>
                     <Icon name={e.ticketUrl ? "arrow-up-right" : "arrow-right"} class="tix-arrow-r tix-arrow size-6 text-acid" />
+                  </a>
+                ) : wait ? (
+                  <a href={`${href(lang, `/events/${e.slug}`)}#waitlist`} class="btn btn-ghost relative z-10 justify-between group-hover:border-acid group-hover:text-acid">
+                    Waiting list <Icon name="bell-simple-ringing" />
                   </a>
                 ) : (
                   <span class="btn btn-ghost pointer-events-none justify-between group-hover:border-acid group-hover:text-acid">
@@ -166,7 +174,6 @@ const pad = (n: number) => String(n).padStart(2, "0");
     clip-path: inset(0 0 100% 0);
     transition: opacity 0.3s var(--ease-out-expo), clip-path 0.5s var(--ease-out-expo);
   }
-  .ev:hover::before,
   .ev:focus-within::before {
     opacity: 1;
     clip-path: inset(0 0 0 0);
@@ -174,19 +181,23 @@ const pad = (n: number) => String(n).padStart(2, "0");
   /* Only the inner span moves: a translate on the link itself would shrink its full-card ::after to the title */
   .ev-title { transition: color 0.25s; }
   .ev-name { transition: translate 0.45s var(--ease-out-expo); }
-  .ev:hover .ev-title,
   .ev:focus-within .ev-title { color: var(--color-acid); }
-  .ev:hover .ev-name,
   .ev:focus-within .ev-name { translate: 0.5rem 0; }
   .ev-arrow {
     opacity: 0;
     translate: -0.75rem 0.75rem;
     transition: opacity 0.25s, translate 0.45s var(--ease-out-expo);
   }
-  .ev:hover .ev-arrow,
   .ev:focus-within .ev-arrow {
     opacity: 1;
     translate: 0 0;
+  }
+  /* Same states on hover, for real pointers only: a tap on touch would leave them stuck on */
+  @media (hover: hover) and (pointer: fine) {
+    .ev:hover::before { opacity: 1; clip-path: inset(0 0 0 0); }
+    .ev:hover .ev-title { color: var(--color-acid); }
+    .ev:hover .ev-name { translate: 0.5rem 0; }
+    .ev:hover .ev-arrow { opacity: 1; translate: 0 0; }
   }
   @media (prefers-reduced-motion: reduce) {
     .ev::before { clip-path: none; }

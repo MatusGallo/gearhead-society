@@ -1,0 +1,849 @@
+---
+/**
+ * Gearhead ID: the member card with an NFC chip. Hero with the card ejecting from a slot (pointer tilt, flip),
+ * the card's anatomy with numbered pins, how it works, the configurator (live preview beside the order form) and
+ * questions. Orders go to `site.idCard.endpoint` as JSON when set, otherwise out as a prefilled e-mail, like
+ * ticket orders. Cards are picked up at an event after an ID check; with `site.idCard.open` off the form says so.
+ */
+import Layout from "../../layouts/Layout.astro";
+import ContentRail from "../../components/ContentRail.astro";
+import Icon from "../../components/Icon.astro";
+import IdCard from "../../components/IdCard.astro";
+import Pointer from "../../components/Pointer.astro";
+import { formatNumeric, formatPrice, isWaitlist, upcomingEvents } from "../../data/events";
+import {
+  countries,
+  countryName,
+  gearTags,
+  languageName,
+  languages,
+  maxGear,
+  maxHandle,
+  maxLangs,
+  pronounOptions,
+  sampleCard,
+  type IdCardData,
+} from "../../data/idcard";
+import { site } from "../../data/site";
+import { href, langPaths, translator, ui, type Lang } from "../../i18n";
+
+export const getStaticPaths = langPaths;
+const lang = Astro.params.lang as Lang;
+const t = translator(lang);
+const { open, endpoint, price, holderPrice, leadDays } = site.idCard;
+const title = t({ cs: "ID karta", en: "ID card" });
+
+// Events far enough out for the print run
+const pickups = upcomingEvents().filter((e) => e.start && !isWaitlist(e) && Date.parse(e.start) - leadDays * 864e5 > Date.now());
+
+const sampleLabel = t({
+  cs: "Vzor ID karty: přezdívka Visor, zájmena they/them, Česko, mluví česky, anglicky a německy, gear tactical, MX a boty, číslo GH 0417.",
+  en: "Sample ID card: handle Visor, pronouns they/them, Czechia, speaks Czech, English and German, gear tactical, MX and boots, number GH 0417.",
+});
+
+// Configurator starts from a blank card in the page language
+const draft: IdCardData = { handle: t({ cs: "Přezdívka", en: "Handle" }), country: "CZ", langs: [lang], gear: [], since: new Date().getFullYear() };
+
+const specs = [
+  { k: t({ cs: "Cena", en: "Price" }), v: formatPrice(price) },
+  { k: t({ cs: "Formát", en: "Format" }), v: "85,6 × 54 mm" },
+  { k: t({ cs: "Čip", en: "Chip" }), v: "NFC" },
+];
+
+// Anatomy: pin position on the card (percent of width / height) and the legend
+const parts = [
+  {
+    at: [29, 24.3],
+    head: t({ cs: "Přezdívka", en: "Handle" }),
+    text: t({ cs: "Jméno, pod kterým tě lidi znají. Příjmení ani fotku na kartu nedáváme.", en: "The name people know you by. No surname and no photo on the card." }),
+  },
+  {
+    at: [18.5, 31.2],
+    head: t({ cs: "Zájmena", en: "Pronouns" }),
+    text: t({ cs: "Nepovinná. Ať nikdo nemusí hádat.", en: "Optional. So nobody has to guess." }),
+  },
+  {
+    at: [6.6, 56.5],
+    head: t({ cs: "Země a jazyky", en: "Country and languages" }),
+    text: t({ cs: `Odkud jsi a až ${maxLangs} jazyky, kterými mluvíš. Na akce jezdí lidi z celé Evropy.`, en: `Where you are from and up to ${maxLangs} languages you speak. People come from all over Europe.` }),
+  },
+  {
+    at: [29.6, 56.5],
+    head: "Gear",
+    text: t({ cs: `Až ${maxGear} věci, ve kterých chodíš. Nejlepší začátek rozhovoru.`, en: `Up to ${maxGear} things you wear. The best way to start a conversation.` }),
+  },
+  {
+    at: [88.5, 48.7],
+    head: t({ cs: "NFC čip", en: "NFC chip" }),
+    text: t({
+      cs: "Přilož telefon a otevře se tvůj profil: Instagram, Discord, Recon nebo web. Čip nese náš krátký odkaz, takže cíl změníme i bez nové karty.",
+      en: "Hold a phone to it and your profile opens: Instagram, Discord, Recon or a website. The chip carries our short link, so we can change the target without a new card.",
+    }),
+  },
+  {
+    at: [41.7, 56.5],
+    head: t({ cs: "Číslo karty", en: "Card number" }),
+    text: t({ cs: "Podle něj kartu vydáme, přesměrujeme odkaz nebo ji po ztrátě zablokujeme.", en: "We use it to hand the card over, move the link, or block the card if it is lost." }),
+  },
+];
+
+// The back: pins on the second card below the front, numbered on from the front's
+const backParts = [
+  {
+    at: [23, 69.5],
+    head: t({ cs: "Krátký odkaz", en: "Short link" }),
+    text: t({ cs: "Pro telefony bez NFC. Vede na stejný profil jako čip.", en: "For phones without NFC. Opens the same profile as the chip." }),
+  },
+  {
+    at: [46.6, 69.5],
+    head: t({ cs: "Když se ztratí", en: "If it gets lost" }),
+    text: t({ cs: "Kdo kartu najde, ví, komu napsat. Ty mezitím kartu u nás zablokuješ.", en: "Whoever finds the card knows who to write to. Meanwhile you have us block it." }),
+  },
+  {
+    at: [74, 91.5],
+    head: t({ cs: "Pravidla", en: "House rules" }),
+    text: t({ cs: "Souhlas, respekt a 18+. Karta je nosí s sebou na každou akci.", en: "Consent, respect and 18+. The card carries them to every event." }),
+  },
+];
+
+const steps = [
+  {
+    icon: "pencil-simple-line",
+    head: t({ cs: "Navrhni si ji", en: "Design it" }),
+    text: t({ cs: "Vyplň, co má být na kartě, a vyber akci, kde si ji vyzvedneš. Náhled se mění, jak píšeš.", en: "Fill in what goes on the card and pick the event where you collect it. The preview changes as you type." }),
+  },
+  {
+    icon: "identification-card",
+    head: t({ cs: "Vyzvedni si ji", en: "Collect it" }),
+    text: t({ cs: "Kartu dostaneš u vstupu na vybrané akci, jen osobně a po kontrole dokladu. Nikomu jinému ji nedáme.", en: "You get the card at the door of the event you picked, in person and after an ID check. We hand it to nobody else." }),
+  },
+  {
+    icon: "hand-tap",
+    head: t({ cs: "Ťukni a spoj se", en: "Tap and connect" }),
+    text: t({ cs: "Potkáš někoho na parketu? Přiloží telefon ke kartě a má tvůj profil. Žádné diktování přezdívek přes hudbu.", en: "Meet someone on the floor? They hold a phone to your card and have your profile. No shouting handles over the music." }),
+  },
+];
+
+const faq = [
+  {
+    q: t({ cs: "Potřebuju kartu na vstup?", en: "Do I need the card to get in?" }),
+    a: t({ cs: "Ne. Karta je dobrovolná a slouží k seznamování. Na vstup dál platí vstupenka a doklad s fotkou.", en: "No. The card is optional and is for meeting people. Entry still takes a ticket and photo ID." }),
+  },
+  {
+    q: t({ cs: "Co když kartu ztratím?", en: "What if I lose the card?" }),
+    a: t({ cs: `Napiš nám na ${site.email} s číslem karty. Starou kartu hned odpojíme a novou vyrobíme za cenu výroby.`, en: `Write to ${site.email} with the card number. We disconnect the old card right away and make a new one at production cost.` }),
+  },
+  {
+    q: t({ cs: "Jak změním odkaz na profil?", en: "How do I change my profile link?" }),
+    a: t({ cs: `Pošli číslo karty a nový odkaz na ${site.email}. Přesměrujeme ho, karta zůstává stejná.`, en: `Send the card number and the new link to ${site.email}. We redirect it, the card stays the same.` }),
+  },
+  {
+    q: t({ cs: "Funguje to na každém telefonu?", en: "Does it work with every phone?" }),
+    a: t({
+      cs: "Na většině. iPhone od modelu XS čte NFC sám, na Androidu stačí mít NFC zapnuté. Bez NFC poslouží krátký odkaz na zadní straně karty.",
+      en: "On most. iPhones from the XS on read NFC on their own; on Android NFC just has to be on. Without NFC, the short link on the back of the card does the job.",
+    }),
+  },
+  {
+    q: t({ cs: "Do kdy musím objednat?", en: "When do I need to order by?" }),
+    a: t({ cs: `Nejpozději ${leadDays} dní před akcí, na které si kartu chceš vyzvednout. Tiskneme v sériích.`, en: `At least ${leadDays} days before the event where you want to collect it. We print in batches.` }),
+  },
+  {
+    q: t({ cs: "Proč je karta v angličtině?", en: "Why is the card in English?" }),
+    a: t({ cs: "Aby ji přečetl každý, kdo na akci přijede. Jazyky, kterými mluvíš, na ní máš napsané.", en: "So everyone who comes to the event can read it. The languages you speak are printed on it." }),
+  },
+];
+
+// Copy the script needs, in the page language
+const copy = {
+  subject: `${site.name} ID`,
+  lines: {
+    ref: t({ cs: "Objednávka", en: "Order" }),
+    card: t({ cs: "Karta", en: "Card" }),
+    handle: t({ cs: "Přezdívka", en: "Handle" }),
+    pronouns: t({ cs: "Zájmena", en: "Pronouns" }),
+    country: t({ cs: "Země", en: "Country" }),
+    langs: t({ cs: "Jazyky", en: "Languages" }),
+    gear: "Gear",
+    link: t({ cs: "Odkaz pro NFC", en: "NFC link" }),
+    holder: t({ cs: "Pouzdro s karabinou", en: "Holder with carabiner" }),
+    pickup: t({ cs: "Vyzvednutí", en: "Pickup" }),
+    total: t({ cs: "Celkem", en: "Total" }),
+    name: t({ cs: "Jméno", en: "Name" }),
+    email: "E-mail",
+    yes: t({ cs: "ano", en: "yes" }),
+    no: t({ cs: "ne", en: "no" }),
+    later: t({ cs: "nastavit později", en: "set later" }),
+    agree: t({ cs: "Potvrzuji 18+ a souhlasím s obchodními podmínkami.", en: "I confirm I am 18+ and accept the terms of sale." }),
+  },
+  errors: {
+    handle: t({ cs: "Napiš přezdívku, alespoň 2 znaky.", en: "Enter a handle, at least 2 characters." }),
+    langs: t({ cs: "Vyber alespoň jeden jazyk.", en: "Pick at least one language." }),
+    pickup: t({ cs: "Vyber akci, kde si kartu vyzvedneš.", en: "Pick the event where you collect the card." }),
+    name: t({ cs: "Napiš jméno a příjmení, jak je máš na dokladu.", en: "Enter your full name as it appears on your ID." }),
+    email: t({ cs: "Zkontroluj e-mail, sem ti pošleme potvrzení.", en: "Check the e-mail address, the confirmation goes there." }),
+    age: t({ cs: "Kartu vydáváme jen od 18 let.", en: "Cards are for 18+ only." }),
+    terms: t({ cs: "Bez souhlasu s podmínkami objednávku nepřijmeme.", en: "We need you to accept the terms to take the order." }),
+  },
+  done: {
+    received: t({ cs: "Přijato", en: "Received" }),
+    ready: t({ cs: "Připraveno k odeslání", en: "Ready to send" }),
+    titleSent: t({ cs: "Objednávka přijata", en: "Order received" }),
+    titleMail: t({ cs: "Odešli e-mail", en: "Send the e-mail" }),
+    textSent: t({ cs: "Díky. Potvrzení s platebními údaji ti přijde e-mailem.", en: "Thanks. A confirmation with the payment details is on its way to your inbox." }),
+    textMail: t({
+      cs: `Otevřeli jsme ti e-mail s objednávkou. Objednávku máme, až ho odešleš. Neotevřel se? Pošli text níže na ${site.email}.`,
+      en: `We opened an e-mail with your order. We have it once you send it. Nothing opened? Send the text below to ${site.email}.`,
+    }),
+    fail: t({ cs: `Objednávku se nepodařilo odeslat. Zkus to znovu, nebo nám napiš na ${site.email}.`, en: `The order did not go through. Try again, or write to us at ${site.email}.` }),
+  },
+};
+
+const field = "field mt-2 block w-full";
+const chip = "mono inline-flex min-h-11 items-center gap-2 border border-line px-3.5 text-xs transition-colors peer-checked:border-acid peer-checked:bg-acid peer-checked:text-ink peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-acid peer-disabled:opacity-35 hover:border-bone/50";
+---
+
+<Layout lang={lang} title={title} description={t({ cs: "Gearhead ID: členská karta s NFC čipem. Přezdívka, jazyky a gear na kartě, profil na jedno ťuknutí.", en: "Gearhead ID: a member card with an NFC chip. Handle, languages and gear on the card, your profile in one tap." })}>
+  <!-- HERO: copy and specs on the left, the card ejecting from a slot on the right (tilts with the pointer, flips) -->
+  <section class="relative overflow-hidden pt-15" data-pointer>
+    <div class="mx-auto grid max-w-[1400px] items-center gap-14 px-4 pt-14 pb-20 sm:px-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-10 lg:pt-20 lg:pb-28">
+      <div>
+        <p class="title-in mono text-xs text-mute">{site.name} / {t({ cs: "Členská karta", en: "Member card" })}</p>
+        <h1 class="title-in display mt-5 text-[clamp(2.5rem,11.5vw,5rem)] !leading-[0.85] lg:text-[clamp(3rem,5.2vw,5rem)]" style="--i:1">
+          <span class="block whitespace-nowrap">Gearhead</span>
+          <span class="block text-[1.9em] text-acid">ID</span>
+        </h1>
+        <span class="rule-draw mt-8 block h-px w-full max-w-md bg-acid" aria-hidden="true"></span>
+        <p class="title-in mt-7 max-w-[46ch] text-lg leading-relaxed text-bone/80" style="--i:3">
+          {t({ cs: "Tvoje přezdívka, jazyky a gear na jedné kartě. Někdo ji naskenuje telefonem a má tvůj profil. Žádná fotka, žádné příjmení: jen to, co chceš ukázat.", en: "Your handle, languages and gear on one card. Someone taps it with a phone and has your profile. No photo, no surname: only what you want to show." })}
+        </p>
+        <dl class="title-in mt-10 grid max-w-lg grid-cols-3 border border-line" style="--i:4">
+          {specs.map((s, i) => (
+            <div class:list={["p-3 sm:p-4", i > 0 && "border-l border-line"]}>
+              <dt class="mono text-[0.65rem] text-mute">{s.k}</dt>
+              <dd class="mono mt-2 text-xs whitespace-nowrap sm:text-base">{s.v}</dd>
+            </div>
+          ))}
+        </dl>
+        <div class="title-in mt-8 flex flex-wrap gap-3" style="--i:5">
+          <a href="#order" class="btn btn-acid">{open ? t({ cs: "Navrhnout kartu", en: "Design your card" }) : t({ cs: "Objednávky zavřené", en: "Orders closed" })} <Icon name="arrow-down" /></a>
+          <a href="#how" class="btn btn-ghost">{t({ cs: "Jak to funguje", en: "How it works" })}</a>
+        </div>
+      </div>
+
+      <div class="relative">
+        <!-- Stage readouts: format and chip, real specs of the card -->
+        <div class="mono mb-4 flex items-center justify-between gap-4 text-[0.65rem] text-mute" aria-hidden="true">
+          <span class="flex items-center gap-2"><Icon name="plus" class="size-3 text-acid" /> CR80 / 85.6 × 54 mm</span>
+          <span>NFC 13.56 MHz</span>
+        </div>
+        <div class="idh-stage">
+          <div class="idh-eject">
+            <div class="idh-tilt" data-flip-target data-pointer-vars>
+              <IdCard data={sampleCard} label={sampleLabel} class="idh-card" />
+              <span class="idh-glare" aria-hidden="true" data-pointer-vars></span>
+            </div>
+          </div>
+          <span class="idh-slot" aria-hidden="true"></span>
+        </div>
+        <div class="mt-8 flex flex-wrap items-center justify-between gap-4">
+          <div class="mono flex border border-line text-xs" role="group" aria-label={t({ cs: "Strana karty", en: "Card side" })} data-flip-group>
+            <button type="button" class="idh-side" aria-pressed="true" data-side="front">01 {t({ cs: "Líc", en: "Front" })}</button>
+            <button type="button" class="idh-side border-l border-line" aria-pressed="false" data-side="back">02 {t({ cs: "Rub", en: "Back" })}</button>
+          </div>
+          <span class="chip border border-line">{t({ cs: "Vzor", en: "Sample" })}</span>
+        </div>
+      </div>
+    </div>
+    <Pointer />
+  </section>
+
+  <!-- ANATOMY: the front with numbered pins, the legend flickers on like a readout -->
+  <section class="bg-coal">
+    <div class="relative mx-auto max-w-[1400px] px-4 py-24 sm:px-6 lg:pl-24">
+      <ContentRail label={title} />
+      <h2 class="heading-in display max-w-[16ch] text-[clamp(2.25rem,6vw,4.5rem)]">{t({ cs: "Co na kartě je", en: "What is on the card" })}</h2>
+      <div class="mt-14 grid items-start gap-12 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+        <div class="grid gap-8">
+          {[{ face: "front", list: parts, from: 0 }, { face: "back", list: backParts, from: parts.length }].map((side) => (
+            <figure>
+              <div class="relative">
+                <IdCard data={sampleCard} face={side.face as "front" | "back"} label={sampleLabel} />
+                <div class="boot-in pointer-events-none absolute inset-0 hidden sm:block" aria-hidden="true">
+                  {side.list.map((p, i) => (
+                    <span class="idh-pin mono" style={`left:${p.at[0]}%;top:${p.at[1]}%;--i:${i}`}>{String(side.from + i + 1).padStart(2, "0")}</span>
+                  ))}
+                </div>
+              </div>
+              <figcaption class="mono mt-3 text-xs text-mute">{side.face === "front" ? t({ cs: "01 Líc", en: "01 Front" }) : t({ cs: "02 Rub", en: "02 Back" })}</figcaption>
+            </figure>
+          ))}
+        </div>
+        <ol class="boot-in border-t border-line">
+          {[...parts, ...backParts].map((p, i) => (
+            <li class="grid grid-cols-[2.5rem_1fr] gap-4 border-b border-line py-5" style={`--i:${i}`}>
+              <span class="mono text-acid">{String(i + 1).padStart(2, "0")}</span>
+              <div>
+                <h3 class="mono text-sm">{p.head}</h3>
+                <p class="mt-2 text-sm leading-relaxed text-bone/75">{p.text}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS: three steps, each wipes open behind an acid bar, then the price line -->
+  <section id="how" class="mx-auto max-w-[1400px] scroll-mt-20 px-4 py-24 sm:px-6 lg:pl-24">
+    <div class="flex flex-wrap items-end justify-between gap-6">
+      <h2 class="display max-w-[14ch] text-[clamp(2.25rem,6vw,4.5rem)]">{t({ cs: "Tři kroky k ťuknutí", en: "Three steps to the tap" })}</h2>
+      <p class="mono max-w-xs text-xs leading-relaxed text-mute">{t({ cs: `Objednávky do ${leadDays} dní před akcí`, en: `Orders close ${leadDays} days before the event` })}</p>
+    </div>
+    <ol class="mt-12 grid gap-px bg-line md:grid-cols-3">
+      {steps.map((s, i) => (
+        <li class="wipe relative bg-ink" style={`--i:${i}`}>
+          <div class="flex h-full flex-col gap-10 border border-line p-6 sm:p-8">
+            <div class="flex items-center justify-between">
+              <span class="display text-5xl text-acid">{String(i + 1).padStart(2, "0")}</span>
+              <span class="grid size-11 place-items-center border border-line"><Icon name={s.icon} class="size-5" /></span>
+            </div>
+            <div class="mt-auto">
+              <h3 class="display text-2xl sm:text-3xl">{s.head}</h3>
+              <p class="mt-3 max-w-[40ch] leading-relaxed text-bone/75">{s.text}</p>
+            </div>
+          </div>
+        </li>
+      ))}
+    </ol>
+    <div class="mono mt-6 flex flex-wrap gap-x-8 gap-y-2 text-xs text-bone/80">
+      <span><span class="text-acid">+</span> {t({ cs: "Karta", en: "Card" })} {formatPrice(price)}</span>
+      <span><span class="text-acid">+</span> {copy.lines.holder} {formatPrice(holderPrice)}</span>
+      <span><span class="text-acid">+</span> {ui.footer.adults[lang]}</span>
+    </div>
+  </section>
+
+  <!-- CONFIGURATOR: the order form beside a live preview that docks in from the right -->
+  <section id="order" class="relative scroll-mt-20 border-t border-line">
+    <div class="relative mx-auto max-w-[1400px] px-4 py-24 sm:px-6 lg:pl-24">
+      <ContentRail label={t({ cs: "Konfigurátor", en: "Configurator" })} variant={4} />
+      <h2 class="heading-in display text-[clamp(2.25rem,6vw,4.5rem)]">{t({ cs: "Navrhni si kartu", en: "Design your card" })}</h2>
+      <div
+        class="mt-12 grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-16"
+        data-idorder
+        data-endpoint={endpoint}
+        data-email={site.email}
+        data-price={price}
+        data-holder={holderPrice}
+        data-lang={lang}
+        data-copy={JSON.stringify(copy)}
+      >
+        <div class="min-w-0">
+          {
+            !open ? (
+              <div class="max-w-xl border border-line p-6 sm:p-8">
+                <p class="display text-3xl">{t({ cs: "Objednávky jsou teď zavřené", en: "Orders are closed right now" })}</p>
+                <p class="mt-4 leading-relaxed text-bone/75">
+                  {t({ cs: "Další tiskovou sérii ohlásíme na Instagramu a Discordu. Máš už kartu a chceš změnit odkaz? Napiš nám s číslem karty.", en: "We announce the next print run on Instagram and Discord. Already have a card and want to change the link? Write to us with the card number." })}
+                </p>
+                <a href={`mailto:${site.email}?subject=${encodeURIComponent(copy.subject)}`} class="btn btn-ghost mt-6">{site.email} <Icon name="envelope-simple" /></a>
+              </div>
+            ) : (
+              <>
+                <form class="max-w-2xl" action={`mailto:${site.email}?subject=${encodeURIComponent(copy.subject)}`} method="post" enctype="text/plain" novalidate data-idform>
+                  <fieldset class="border-t border-line pt-8">
+                    <legend class="mono float-left flex w-full items-center gap-3 text-xs text-mute"><span class="text-acid">01</span> {t({ cs: "Na kartě", en: "On the card" })}</legend>
+                    <div class="clear-both grid gap-6 pt-6 sm:grid-cols-2">
+                      <label class="block sm:col-span-2">
+                        <span class="mono text-xs">{copy.lines.handle}</span>
+                        <input type="text" name="handle" required minlength="2" maxlength={maxHandle} autocomplete="nickname" spellcheck="false" class={`${field} mono uppercase`} aria-describedby="handle-hint handle-error" />
+                        <span id="handle-hint" class="mt-1.5 flex justify-between gap-4 text-xs text-mute">
+                          <span>{t({ cs: "Písmena, čísla, tečka, pomlčka. Tiskneme verzálkami.", en: "Letters, numbers, dot, hyphen. Printed in capitals." })}</span>
+                          <span class="mono tabular-nums" data-count>0/{maxHandle}</span>
+                        </span>
+                        <span id="handle-error" class="field-error" data-error="handle" />
+                      </label>
+                      <label class="block">
+                        <span class="mono text-xs">{copy.lines.pronouns} <span class="text-mute">({t({ cs: "nepovinné", en: "optional" })})</span></span>
+                        <select name="pronouns" class={`${field} mono`}>
+                          <option value="">{t({ cs: "Neuvádět", en: "Leave off" })}</option>
+                          {pronounOptions.map((p) => <option value={p}>{p}</option>)}
+                        </select>
+                      </label>
+                      <label class="block">
+                        <span class="mono text-xs">{copy.lines.country}</span>
+                        <select name="country" class={`${field} mono`}>
+                          {countries.map((c) => <option value={c} selected={c === "CZ"}>{c} / {countryName(c, lang)}</option>)}
+                        </select>
+                      </label>
+                      <fieldset class="sm:col-span-2" aria-describedby="langs-error">
+                        <legend class="mono text-xs">{copy.lines.langs} <span class="text-mute">({t({ cs: `až ${maxLangs}`, en: `up to ${maxLangs}` })})</span></legend>
+                        <div class="mt-3 flex flex-wrap gap-2" data-max={maxLangs}>
+                          {languages.map((l) => (
+                            <label>
+                              <input type="checkbox" name="langs" value={l} checked={l === lang} class="peer sr-only" />
+                              <span class={chip}><b class="font-medium">{l.toUpperCase()}</b> <span class="normal-case opacity-70">{languageName(l, lang)}</span></span>
+                            </label>
+                          ))}
+                        </div>
+                        <span id="langs-error" class="field-error" data-error="langs" />
+                      </fieldset>
+                      <fieldset class="sm:col-span-2">
+                        <legend class="mono text-xs">Gear <span class="text-mute">({t({ cs: `až ${maxGear}, nepovinné`, en: `up to ${maxGear}, optional` })})</span></legend>
+                        <div class="mt-3 flex flex-wrap gap-2" data-max={maxGear}>
+                          {gearTags.map((g) => (
+                            <label>
+                              <input type="checkbox" name="gear" value={g.key} data-print={g.label.en} class="peer sr-only" />
+                              <span class={chip}>{g.label[lang]}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </fieldset>
+                    </div>
+                  </fieldset>
+
+                  <fieldset class="mt-12 border-t border-line pt-8">
+                    <legend class="mono float-left flex w-full items-center gap-3 text-xs text-mute"><span class="text-acid">02</span> {t({ cs: "Čip a vyzvednutí", en: "Chip and pickup" })}</legend>
+                    <div class="clear-both grid gap-6 pt-6">
+                      <label class="block">
+                        <span class="mono text-xs">{copy.lines.link} <span class="text-mute">({t({ cs: "nepovinné", en: "optional" })})</span></span>
+                        <input type="text" name="link" inputmode="url" spellcheck="false" autocomplete="url" class={field} placeholder="instagram.com/..." />
+                        <span class="mt-1.5 block text-xs text-mute">{t({ cs: "Instagram, Discord, Recon nebo web. Nech prázdné a nastavíme ho později.", en: "Instagram, Discord, Recon or a website. Leave it empty and we set it later." })}</span>
+                      </label>
+                      <label class="block">
+                        <span class="mono text-xs">{copy.lines.pickup}</span>
+                        <select name="pickup" required class={`${field} mono`} aria-describedby="pickup-error">
+                          {pickups.length === 0 && <option value="TBA">{t({ cs: "Termín ohlásíme", en: "Date to be announced" })}</option>}
+                          {pickups.map((e) => <option value={`${e.title}, ${formatNumeric(e.start, lang)}`}>{e.title} / {formatNumeric(e.start, lang)}</option>)}
+                        </select>
+                        <span id="pickup-error" class="field-error" data-error="pickup" />
+                      </label>
+                      <label class="flex items-center justify-between gap-4 border border-line p-4">
+                        <span class="flex items-start gap-3">
+                          <input type="checkbox" name="holder" class="tick mt-0.5" />
+                          <span>
+                            <span class="mono block text-sm">{copy.lines.holder}</span>
+                            <span class="mt-1 block text-xs text-mute">{t({ cs: "Průhledné pouzdro, karabina na postroj nebo opasek.", en: "Clear holder, carabiner for a harness or belt." })}</span>
+                          </span>
+                        </span>
+                        <span class="mono text-sm whitespace-nowrap text-acid">+ {formatPrice(holderPrice)}</span>
+                      </label>
+                    </div>
+                  </fieldset>
+
+                  <fieldset class="mt-12 border-t border-line pt-8">
+                    <legend class="mono float-left flex w-full items-center gap-3 text-xs text-mute"><span class="text-acid">03</span> {t({ cs: "Kontakt, netiskne se", en: "Contact, not printed" })}</legend>
+                    <div class="clear-both grid gap-6 pt-6 sm:grid-cols-2">
+                      <label class="block sm:col-span-2">
+                        <span class="mono text-xs">{t({ cs: "Jméno a příjmení", en: "Full name" })}</span>
+                        <input type="text" name="name" required minlength="3" autocomplete="name" class={field} aria-describedby="name-hint name-error" />
+                        <span id="name-hint" class="mt-1.5 block text-xs text-mute">{t({ cs: "Jak ho máš na dokladu. Podle něj ti kartu vydáme, na kartu se nedostane.", en: "As on your ID. We use it to hand you the card, it never goes on it." })}</span>
+                        <span id="name-error" class="field-error" data-error="name" />
+                      </label>
+                      <label class="block sm:col-span-2">
+                        <span class="mono text-xs">E-mail</span>
+                        <input type="email" name="email" required autocomplete="email" spellcheck="false" class={field} aria-describedby="email-error" />
+                        <span id="email-error" class="field-error" data-error="email" />
+                      </label>
+                    </div>
+                    <div class="space-y-4 pt-8">
+                      <label class="flex items-start gap-3">
+                        <input type="checkbox" name="age" required class="tick mt-0.5" aria-describedby="age-error" />
+                        <span class="text-sm leading-relaxed">
+                          {t({ cs: "Je mi 18 let a při vyzvednutí ukážu doklad s fotkou.", en: "I am 18 or older and will show photo ID at pickup." })}
+                          <span id="age-error" class="field-error" data-error="age" />
+                        </span>
+                      </label>
+                      <label class="flex items-start gap-3">
+                        <input type="checkbox" name="terms" required class="tick mt-0.5" aria-describedby="terms-error" />
+                        <span class="text-sm leading-relaxed">
+                          {t({ cs: "Souhlasím s ", en: "I accept the " })}
+                          <a href={href(lang, "/terms")} target="_blank" class="text-acid underline underline-offset-4 hover:text-bone">{t({ cs: "obchodními podmínkami", en: "terms of sale" })}</a>
+                          {t({ cs: ". Karta se vyrábí na míru, proto ji po tisku nelze vrátit.", en: ". The card is made to order, so it cannot be returned once printed." })}
+                          <span id="terms-error" class="field-error" data-error="terms" />
+                        </span>
+                      </label>
+                      <p class="text-xs leading-relaxed text-mute">
+                        {t({ cs: "Jméno a e-mail použijeme jen k vyřízení objednávky a vydání karty. ", en: "We use your name and e-mail only to handle the order and hand over the card. " })}
+                        <a href={href(lang, "/privacy")} class="underline underline-offset-4 hover:text-acid">{ui.footer.privacy[lang]}</a>
+                      </p>
+                    </div>
+                  </fieldset>
+
+                  <button type="submit" class="btn btn-acid mt-10 w-full justify-between disabled:cursor-progress disabled:opacity-70" data-submit>
+                    <span data-submit-idle>{t({ cs: "Objednat kartu", en: "Order the card" })}</span>
+                    <span class="hidden" data-submit-busy>{t({ cs: "Odesílám", en: "Sending" })}</span>
+                    <span class="mono tabular-nums" data-total-btn>{formatPrice(price)}</span>
+                  </button>
+                  <p class="mt-3 text-xs text-mute">
+                    {endpoint
+                      ? t({ cs: "Odesláním zatím nic neplatíš. Platební údaje ti pošleme e-mailem.", en: "Ordering does not charge you. We e-mail you the payment details." })
+                      : t({ cs: "Otevře se ti e-mail s hotovou objednávkou, stačí ho odeslat. Zatím nic neplatíš.", en: "Your mail app opens with the order filled in, just send it. Nothing is charged yet." })}
+                  </p>
+                  <p class="field-error mt-4" role="alert" data-error="send" />
+                </form>
+
+                <!-- CONFIRMATION -->
+                <div class="max-w-2xl scroll-mt-24 outline-none" hidden tabindex="-1" data-iddone>
+                  <div class="border border-acid">
+                    <p class="mono flex items-center justify-between gap-4 bg-acid px-5 py-2 text-xs text-ink">
+                      <span class="flex items-center gap-2"><Icon name="check-circle" class="size-4" /> <span data-done-state /></span>
+                      <span class="tabular-nums" data-done-ref />
+                    </p>
+                    <div class="p-5 sm:p-6">
+                      <p class="display text-3xl sm:text-4xl" data-done-title />
+                      <p class="mt-3 leading-relaxed text-bone/80" data-done-text />
+                      <a href="#" class="btn btn-acid mt-5 hidden" data-done-mailto>{t({ cs: "Otevřít e-mail znovu", en: "Open the e-mail again" })} <Icon name="envelope-simple" /></a>
+                      <pre class="mono mt-5 hidden overflow-x-auto border border-line bg-ink p-4 text-xs leading-relaxed whitespace-pre-wrap text-bone/80 normal-case" data-done-body />
+                    </div>
+                  </div>
+                </div>
+              </>
+            )
+          }
+        </div>
+
+        <!-- LIVE PREVIEW -->
+        <aside class="slide-in order-first lg:sticky lg:top-24 lg:order-last lg:self-start" aria-label={t({ cs: "Náhled karty", en: "Card preview" })}>
+          <div class="relative">
+            <span class="frame frame-on absolute inset-0" aria-hidden="true"></span>
+            <IdCard data={draft} label={t({ cs: "Náhled tvé karty", en: "Preview of your card" })} class="idp-card" />
+          </div>
+          <div class="mono mt-6 flex flex-wrap items-center justify-between gap-4 text-xs">
+            <button type="button" class="btn btn-ghost min-h-11 px-5" data-preview-flip>
+              <Icon name="arrows-clockwise" /> <span data-flip-label data-front={t({ cs: "Ukázat rub", en: "Show back" })} data-back={t({ cs: "Ukázat líc", en: "Show front" })}>{t({ cs: "Ukázat rub", en: "Show back" })}</span>
+            </button>
+            <span class="text-mute">{t({ cs: "Číslo karty přidělíme s objednávkou", en: "The card number comes with the order" })}</span>
+          </div>
+          <dl class="mono mt-6 border-t border-line text-xs">
+            <div class="flex justify-between gap-4 border-b border-line py-3">
+              <dt class="text-mute">{t({ cs: "Karta", en: "Card" })}</dt>
+              <dd class="tabular-nums">{formatPrice(price)}</dd>
+            </div>
+            <div class="flex justify-between gap-4 border-b border-line py-3">
+              <dt class="text-mute">{copy.lines.holder}</dt>
+              <dd class="tabular-nums" data-holder-out>-</dd>
+            </div>
+            <div class="flex items-baseline justify-between gap-4 py-4">
+              <dt class="text-mute">{copy.lines.total}</dt>
+              <dd class="display text-2xl text-acid tabular-nums" data-total aria-live="polite">{formatPrice(price)}</dd>
+            </div>
+          </dl>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <!-- QUESTIONS: hairline accordion, rises in on scroll -->
+  <section class="bg-coal">
+    <div class="mx-auto grid max-w-[1400px] gap-10 px-4 py-24 sm:px-6 lg:grid-cols-[0.7fr_1.3fr] lg:pl-24">
+      <div>
+        <h2 class="display text-[clamp(2rem,5vw,3.5rem)]">{t({ cs: "Otázky", en: "Questions" })}</h2>
+        <a href={href(lang, "/contact")} class="btn btn-ghost mt-8">{ui.nav.contact[lang]} <Icon name="arrow-right" /></a>
+      </div>
+      <div class="reveal border-t border-line">
+        {faq.map((f) => (
+          <details class="group border-b border-line">
+            <summary class="flex min-h-16 cursor-pointer list-none items-center justify-between gap-6 py-4 [&::-webkit-details-marker]:hidden">
+              <span class="display text-lg sm:text-xl">{f.q}</span>
+              <Icon name="plus" class="size-5 text-acid transition-transform duration-300 group-open:rotate-45" />
+            </summary>
+            <p class="max-w-[62ch] pb-6 leading-relaxed text-bone/75">{f.a}</p>
+          </details>
+        ))}
+      </div>
+    </div>
+  </section>
+</Layout>
+
+<style>
+  /* Hero stage: the card sits behind a slot line and tilts with the pointer (--px/--py from Pointer.astro) */
+  .idh-stage {
+    position: relative;
+    padding: 0 4% 2.5rem;
+    perspective: 1400px;
+  }
+  .idh-tilt {
+    position: relative;
+    cursor: pointer;
+    transform: rotateX(calc(var(--py, 0) * -8deg)) rotateY(calc(var(--px, 0) * 11deg)) rotateZ(-2.5deg);
+    transition: transform 0.7s var(--ease-out-expo);
+    filter: drop-shadow(0 40px 50px rgb(0 0 0 / 0.65));
+  }
+  /* Light sweeps across the card as it tilts; moved with transform only */
+  .idh-glare {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    mix-blend-mode: screen;
+  }
+  .idh-glare::before {
+    content: "";
+    position: absolute;
+    inset: -50%;
+    background: radial-gradient(circle at center, rgb(242 242 242 / 0.14), transparent 35%);
+    transform: translate(calc(var(--px, 0) * 22%), calc(var(--py, 0) * 22%));
+    transition: transform 0.7s var(--ease-out-expo);
+  }
+  .idh-slot {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 0.9rem;
+    border-top: 2px solid var(--color-acid);
+    background: repeating-linear-gradient(90deg, var(--color-line) 0 1px, transparent 1px 10px);
+  }
+  .idh-side {
+    min-height: 2.75rem;
+    padding: 0 1rem;
+    color: var(--color-mute);
+    transition: color 0.25s, background-color 0.25s;
+  }
+  .idh-side[aria-pressed="true"] { background: var(--color-acid); color: var(--color-ink); }
+  .idh-side[aria-pressed="false"]:hover { color: var(--color-bone); }
+
+  /* Anatomy pins: acid square with the number, centred on the part */
+  .idh-pin {
+    position: absolute;
+    translate: -50% -50%;
+    display: grid;
+    place-items: center;
+    width: 1.9rem;
+    height: 1.4rem;
+    background: var(--color-acid);
+    color: var(--color-ink);
+    font-size: 0.7rem;
+    box-shadow: 0 0 0 3px var(--color-coal);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    /* The card prints out of the slot on load: it rises while the clip opens from the slot line up */
+    .idh-eject { animation: idh-eject 1.5s var(--ease-out-expo) 0.3s backwards; }
+    /* The live preview pulses its header once when a field changes */
+    :global(.idp-card[data-bump] .idc-plate) { animation: idh-bump 0.5s var(--ease-out-expo); }
+  }
+  @keyframes idh-eject {
+    from { clip-path: inset(100% -20% -20% -20%); transform: translateY(40%); }
+    to { clip-path: inset(-20%); transform: none; }
+  }
+  @keyframes idh-bump {
+    from { opacity: 0.35; }
+    to { opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .idh-tilt { transform: rotateZ(-2.5deg); }
+    .idh-glare::before { transform: none; }
+    :global(.idc-flip) { transition: none; }
+  }
+</style>
+
+<script>
+  import { mailOrder, money, orderRef, postOrder, showDone, validation } from "../../scripts/order-form";
+
+  // Hero: flip the sample by the side buttons or a click on the card
+  const hero = document.querySelector<HTMLElement>("[data-flip-target]");
+  const sides = [...document.querySelectorAll<HTMLButtonElement>("[data-flip-group] [data-side]")];
+  if (hero) {
+    const card = hero.querySelector<HTMLElement>("[data-idc]")!;
+    const show = (back: boolean) => {
+      card.dataset.flipped = String(back);
+      sides.forEach((b) => b.setAttribute("aria-pressed", String((b.dataset.side === "back") === back)));
+    };
+    sides.forEach((b) => b.addEventListener("click", () => show(b.dataset.side === "back")));
+    hero.addEventListener("click", () => show(card.dataset.flipped !== "true"));
+  }
+
+  type Copy = {
+    subject: string;
+    lines: Record<string, string>;
+    errors: Record<"handle" | "langs" | "pickup" | "name" | "email" | "age" | "terms", string>;
+    done: Record<"received" | "ready" | "titleSent" | "titleMail" | "textSent" | "textMail" | "fail", string>;
+  };
+
+  const root = document.querySelector<HTMLElement>("[data-idorder]");
+  const form = root?.querySelector<HTMLFormElement>("[data-idform]");
+  if (root) {
+    const d = root.dataset;
+    const copy = JSON.parse(d.copy!) as Copy;
+    const $ = <T extends HTMLElement = HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
+    const preview = $("[data-idc]");
+    const f = (k: string) => preview.querySelectorAll<HTMLElement>(`[data-f="${k}"]`);
+    const put = (k: string, v: string) => f(k).forEach((el) => (el.textContent = v));
+    const price = Number(d.price);
+    const holderPrice = Number(d.holder);
+    const blankHandle = f("handle")[0]?.textContent ?? "";
+
+    // Preview flip
+    const flipBtn = $("[data-preview-flip]");
+    const flipLabel = $("[data-flip-label]");
+    const flip = (back: boolean) => {
+      preview.dataset.flipped = String(back);
+      flipLabel.textContent = back ? flipLabel.dataset.back! : flipLabel.dataset.front!;
+    };
+    flipBtn.addEventListener("click", () => flip(preview.dataset.flipped !== "true"));
+
+    if (form) {
+      const el = <T extends Element = HTMLInputElement>(n: string) => form.elements.namedItem(n) as unknown as T;
+      const checked = (n: string) => [...form.querySelectorAll<HTMLInputElement>(`input[name="${n}"]:checked`)].map((i) => i.value);
+      const gearLabel = (k: string) => form.querySelector<HTMLInputElement>(`input[name="gear"][value="${k}"]`)?.nextElementSibling?.textContent?.trim() ?? k;
+      // Gear prints in English (data-print), the e-mail lists it in the page language
+      const gearPrint = (k: string) => form.querySelector<HTMLInputElement>(`input[name="gear"][value="${k}"]`)?.dataset.print ?? k;
+
+      // Chip groups: at most `data-max` ticked, the rest disable once the limit is reached
+      form.querySelectorAll<HTMLElement>("[data-max]").forEach((g) => {
+        const max = Number(g.dataset.max);
+        const boxes = [...g.querySelectorAll<HTMLInputElement>("input[type=checkbox]")];
+        const cap = () => {
+          const n = boxes.filter((b) => b.checked).length;
+          boxes.forEach((b) => (b.disabled = !b.checked && n >= max));
+        };
+        g.addEventListener("change", cap);
+        cap();
+      });
+
+      const regionName = new Intl.DisplayNames(["en"], { type: "region" });
+      let bumpTimer = 0;
+      const render = () => {
+        const handle = el("handle").value.replace(/[^\p{L}\p{N} ._-]/gu, "");
+        if (handle !== el("handle").value) el("handle").value = handle;
+        const shown = handle.trim() || blankHandle;
+        put("handle", shown);
+        f("handle").forEach((n) => n.style.setProperty("--len", String(Math.max(8, shown.length))));
+        $("[data-count]").textContent = `${handle.length}/${el("handle").maxLength}`;
+        put("pronouns", el<HTMLSelectElement>("pronouns").value);
+        const country = el<HTMLSelectElement>("country").value;
+        put("country", country);
+        put("countryName", regionName.of(country) ?? country);
+        const langs = checked("langs");
+        const gear = checked("gear");
+        put("langs", langs.map((l) => l.toUpperCase()).join(" ") || "-");
+        put("nlangs", String(langs.length));
+        put("ngear", String(gear.length));
+        // Gear is a spec column: the label, then one line per item
+        f("gear").forEach((col) => {
+          const lines = (gear.length ? gear.map(gearPrint) : ["-"]).map((g) => Object.assign(document.createElement("span"), { textContent: g }));
+          col.replaceChildren(col.firstElementChild!, ...lines);
+        });
+        const holder = el("holder").checked;
+        $("[data-holder-out]").textContent = holder ? money(holderPrice) : "-";
+        $("[data-total]").textContent = $("[data-total-btn]").textContent = money(price + (holder ? holderPrice : 0));
+      };
+      // One pulse per burst of edits: typing keeps the burst open, so keystrokes never flicker the header
+      let lastEdit = 0;
+      const bump = () => {
+        const now = performance.now();
+        const fresh = now - lastEdit > 800;
+        lastEdit = now;
+        if (!fresh) return;
+        preview.removeAttribute("data-bump");
+        void preview.offsetWidth;
+        preview.setAttribute("data-bump", "");
+        clearTimeout(bumpTimer);
+        bumpTimer = window.setTimeout(() => preview.removeAttribute("data-bump"), 600);
+      };
+      form.addEventListener("input", (e) => {
+        const name = (e.target as HTMLInputElement).name;
+        // Editing a printed field turns the preview to the front
+        if (["handle", "pronouns", "country", "langs", "gear"].includes(name)) {
+          if (preview.dataset.flipped === "true") flip(false);
+          bump();
+        }
+        render();
+      });
+      form.addEventListener("change", render);
+      render();
+
+      const validate = validation(
+        root,
+        form,
+        [
+          { key: "handle", ok: () => el("handle").value.trim().length >= 2, field: () => el("handle") },
+          { key: "langs", ok: () => checked("langs").length > 0, field: () => form.querySelector<HTMLInputElement>('input[name="langs"]')!, aria: false },
+          { key: "pickup", ok: () => !!el<HTMLSelectElement>("pickup").value, field: () => el("pickup") },
+          { key: "name", ok: () => el("name").value.trim().length >= 3, field: () => el("name") },
+          { key: "email", ok: () => el("email").validity.valid && !!el("email").value, field: () => el("email") },
+          { key: "age", ok: () => el("age").checked, field: () => el("age") },
+          { key: "terms", ok: () => el("terms").checked, field: () => el("terms") },
+        ],
+        copy.errors,
+      );
+
+      const done = $("[data-iddone]");
+      const finish = (ref: string, mail?: { href: string; body: string }) => {
+        $("[data-done-ref]").textContent = `#${ref}`;
+        $("[data-done-state]").textContent = mail ? copy.done.ready : copy.done.received;
+        $("[data-done-title]").textContent = mail ? copy.done.titleMail : copy.done.titleSent;
+        $("[data-done-text]").textContent = mail ? copy.done.textMail : copy.done.textSent;
+        if (mail) {
+          const a = $<HTMLAnchorElement>("[data-done-mailto]");
+          a.href = mail.href;
+          a.classList.replace("hidden", "inline-flex");
+          const pre = $("[data-done-body]");
+          pre.textContent = mail.body;
+          pre.classList.remove("hidden");
+        }
+        showDone(form, done);
+      };
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const bad = validate();
+        if (bad) return bad.focus();
+
+        const v = (k: string) => (el(k).value || "").trim();
+        const ref = orderRef();
+        const holder = el("holder").checked;
+        const order = {
+          ref,
+          kind: "id-card",
+          handle: v("handle").toUpperCase(),
+          pronouns: v("pronouns"),
+          country: v("country"),
+          langs: checked("langs"),
+          gear: checked("gear"),
+          link: v("link"),
+          pickup: v("pickup"),
+          holder,
+          total: price + (holder ? holderPrice : 0),
+          currency: "CZK",
+          name: v("name"),
+          email: v("email"),
+          lang: d.lang,
+          acceptedTerms: true,
+          confirmedAdult: true,
+        };
+        const L = copy.lines;
+        const body = [
+          `${L.ref}: ${ref}`,
+          "",
+          `${L.handle}: ${order.handle}`,
+          ...(order.pronouns ? [`${L.pronouns}: ${order.pronouns}`] : []),
+          `${L.country}: ${order.country}`,
+          `${L.langs}: ${order.langs.map((l) => l.toUpperCase()).join(", ")}`,
+          ...(order.gear.length ? [`${L.gear}: ${order.gear.map(gearLabel).join(", ")}`] : []),
+          `${L.link}: ${order.link || L.later}`,
+          "",
+          `${L.pickup}: ${order.pickup}`,
+          `${L.card}: ${money(price)}`,
+          `${L.holder}: ${holder ? money(holderPrice) : L.no}`,
+          `${L.total}: ${money(order.total)}`,
+          "",
+          `${L.name}: ${order.name}`,
+          `${L.email}: ${order.email}`,
+          "",
+          L.agree,
+        ].join("\n");
+
+        if (d.endpoint) {
+          if (await postOrder(root, d.endpoint, order, copy.done.fail)) finish(ref);
+          return;
+        }
+
+        const href = mailOrder(d.email!, `${copy.subject}: ${order.handle} [${ref}]`, body);
+        finish(ref, { href, body });
+      });
+    }
+  }
+</script>

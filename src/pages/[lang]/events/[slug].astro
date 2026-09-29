@@ -9,7 +9,8 @@ import HudRail from "../../../components/HudRail.astro";
 import { hudVariant } from "../../../data/hud";
 import { dissolve } from "../../../data/dissolve";
 import VenueMap from "../../../components/VenueMap.astro";
-import { events, formatDate, formatNumeric, formatPrice, formatTime, isUpcoming, ticketLink, ticketWaves, type EventItem } from "../../../data/events";
+import Waitlist from "../../../components/Waitlist.astro";
+import { events, formatDate, formatNumeric, formatPrice, formatTime, isUpcoming, isWaitlist, ticketLink, ticketWaves, type EventItem } from "../../../data/events";
 import { href, langs, translator, ui, type Lang } from "../../../i18n";
 import { site } from "../../../data/site";
 
@@ -21,6 +22,8 @@ const lang = Astro.params.lang as Lang;
 const t = translator(lang);
 const { event } = Astro.props as { event: EventItem };
 const upcoming = isUpcoming(event);
+// Not announced yet: the page carries the name, edition, summary and the waiting list, nothing about when or where
+const wait = upcoming && isWaitlist(event);
 const waves = ticketWaves(event);
 const currentWave = waves.find((w) => w.state === "current");
 const buy = ticketLink(event, lang);
@@ -33,7 +36,7 @@ const tixNote = currentWave
 
 // schema.org Event for search results: date, place, organiser and the waves as offers
 const pageUrl = new URL(Astro.url.pathname, site.url).href;
-const jsonLd = event.start && {
+const jsonLd = event.start && !wait && {
   "@context": "https://schema.org",
   "@type": "Event",
   name: `${site.name}: ${event.title}`,
@@ -78,6 +81,43 @@ const facts = [
 
 <Layout lang={lang} title={event.title} description={event.summary[lang]}>
   {jsonLd && <script slot="head" type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
+  <!-- WAITING LIST HERO: nothing announced yet, so the sign-up is the page. Everything sits in the middle of the
+       screen: status, the name in full width type, the edition, date / venue / tickets as redacted TBA fields and
+       the waiting list as one bracketed row that opens out from the centre on load -->
+{
+  wait ? (
+  <section class="wl-hero relative flex min-h-[88dvh] flex-col items-center justify-center overflow-hidden pt-15 lg:min-h-[100dvh]" data-pointer>
+    {event.image ? <HeroPlate src={event.image} /> : <ScanField seed={event.seed} labels={[]} pauseLabel={ui.pause[lang]} playLabel={ui.play[lang]} class="!absolute inset-0" />}
+    <div class="wl-shade pointer-events-none absolute inset-0"></div>
+
+    <a href={href(lang, "/events")} class="absolute top-15 left-0 z-[1] mt-4 ml-4 inline-flex min-h-11 items-center gap-2 text-sm text-mute hover:text-acid sm:mt-6 sm:ml-6"><Icon name="arrow-left" /> {ui.allEvents[lang]}</a>
+
+    <div class="relative flex w-full max-w-[1400px] flex-col items-center px-4 py-20 text-center sm:px-6">
+      <p class="mono flex items-center gap-2 text-xs text-acid">
+        <span class="wl-live size-1.5 bg-acid" aria-hidden="true"></span>
+        {t({ cs: "Oznámení čeká", en: "Announcement pending" })}
+      </p>
+      <h1 class="title-in display mt-6 max-w-full text-[clamp(2.75rem,12.5vw,10rem)]" style="--i:1">{event.title}</h1>
+      <p class="title-in mono mt-5 text-sm text-acid" style="--i:2">{event.edition[lang]}</p>
+
+      <dl class="mono mt-10 flex flex-wrap justify-center gap-x-8 gap-y-3 text-[0.7rem] leading-tight">
+        {[t({ cs: "Datum", en: "Date" }), t({ cs: "Místo", en: "Venue" }), ui.tickets[lang]].map((label, i) => (
+          <div class="flex items-center gap-3">
+            <dt class="text-mute">{label}</dt>
+            <dd class="flex items-center gap-2 text-bone">
+              <span class="wl-redact block h-2.5 bg-bone/80" style={`--i:${i};width:${[3.2, 4.4, 2.6][i]}rem`} aria-hidden="true"></span>
+              TBA
+            </dd>
+          </div>
+        ))}
+      </dl>
+
+      <div class="wl-open mt-12 w-full max-w-3xl text-left">
+        <Waitlist event={event} lang={lang} size="lg" />
+      </div>
+    </div>
+  </section>
+  ) : (
   <section class="relative flex min-h-[80dvh] flex-col justify-end overflow-hidden pt-32" data-pointer>
     {
       event.image ? (
@@ -88,7 +128,7 @@ const facts = [
     }
     <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink via-ink/40 to-transparent"></div>
     {
-      event.start && (
+      event.start && !wait && (
         <div class="absolute top-15 right-0 bottom-0 hidden border-l border-line bg-ink/60 px-2 text-acid md:block">
           <HudRail
             class="h-full !py-10"
@@ -106,7 +146,7 @@ const facts = [
       </p>
     </div>
     {
-      upcoming && event.start && (
+      upcoming && event.start && !wait && (
         <div class="relative bg-acid text-ink">
           <div class="hero-in mx-auto grid max-w-[1400px] gap-x-10 gap-y-3 px-4 pt-4 sm:px-6 md:grid-cols-[auto_1fr_auto] md:pt-0">
             <div class="flex items-center gap-4 md:py-4" style="--i:3">
@@ -118,7 +158,7 @@ const facts = [
               <span>{formatTime(event.start)}</span>
               <span>{event.venue[lang]}</span>
             </p>
-            <!-- Violet ticket block with the label knocked out of an acid box, after the Marathon/Nightfall lockup -->
+            {/* Violet ticket block with the label knocked out of an acid box, after the Marathon/Nightfall lockup */}
             <a href="#tickets" class="tix relative -mx-4 flex items-center justify-between gap-5 bg-violet px-4 py-3 sm:-mx-6 sm:px-6 md:mx-0 md:px-5" style={`--i:5;${tixDots}`}>
               <span class="grid gap-1.5">
                 {tixNote && <span class="display text-xs text-acid">{tixNote}</span>}
@@ -131,12 +171,18 @@ const facts = [
       )
     }
   </section>
+  )
+}
 
+  {!wait && (
   <section class="relative mx-auto grid max-w-[1400px] gap-14 px-4 py-20 sm:px-6 lg:grid-cols-[1.4fr_1fr] lg:pl-24">
-    <ContentRail label={event.title} numbers={event.start ? [formatNumeric(event.start, lang).slice(0, 2), formatNumeric(event.start, lang).slice(3, 5)] : undefined} lines={[event.title, `${event.venue[lang]}, ${event.city[lang]}`]} />
+    <ContentRail label={event.title} numbers={event.start && !wait ? [formatNumeric(event.start, lang).slice(0, 2), formatNumeric(event.start, lang).slice(3, 5)] : undefined} lines={wait ? [event.title, event.edition[lang]] : [event.title, `${event.venue[lang]}, ${event.city[lang]}`]} />
     <div>
       <a href={href(lang, "/events")} class="mb-10 inline-flex min-h-11 items-center gap-2 text-sm text-mute hover:text-acid"><Icon name="arrow-left" /> {ui.allEvents[lang]}</a>
       <p class="text-2xl leading-snug sm:text-3xl">{event.summary[lang]}</p>
+      {
+        !wait && (
+          <>
       <div class="mt-8 max-w-[65ch] space-y-5 leading-relaxed text-bone/75">
         {event.description[lang].map((p) => <p>{p}</p>)}
       </div>
@@ -156,9 +202,19 @@ const facts = [
         <p class="mono inline-flex items-center gap-2 text-sm text-acid"><Icon name="t-shirt" class="size-5" /> Dress code</p>
         <p class="mt-2 text-lg">{event.dressCode[lang]}</p>
       </div>
+          </>
+        )
+      }
     </div>
 
     <aside class="space-y-8 lg:sticky lg:top-24 lg:self-start">
+      {
+        wait ? (
+          <div class="border border-line p-5 sm:p-6">
+            <Waitlist event={event} lang={lang} />
+          </div>
+        ) : (
+          <>
       <dl class="grid gap-px overflow-hidden border border-line bg-line sm:grid-cols-2">
         {
           facts.map((f) => (
@@ -220,9 +276,36 @@ const facts = [
           }
         </div>
       </div>
+          </>
+        )
+      }
     </aside>
   </section>
+  )}
 
-  {event.location && <VenueMap lang={lang} venue={event.venue[lang]} location={event.location} start={upcoming ? event.start : undefined} />}
+  {event.location && !wait && <VenueMap lang={lang} venue={event.venue[lang]} location={event.location} start={upcoming ? event.start : undefined} />}
 </Layout>
 
+
+<style>
+  /* Photo darkened most behind the centred copy */
+  .wl-shade {
+    background:
+      radial-gradient(ellipse 70% 60% at 50% 55%, rgb(7 7 7 / 0.82), rgb(7 7 7 / 0.35) 75%, transparent),
+      linear-gradient(to top, rgb(7 7 7) 0%, rgb(7 7 7 / 0.55) 45%, rgb(7 7 7 / 0.4) 100%);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    /* The sign-up row opens out from the centre, the redaction bars flicker on before it */
+    .wl-open { animation: wl-open 1s var(--ease-out-expo) 0.45s both; }
+    .wl-redact { animation: flicker 0.9s steps(8, end) both; animation-delay: calc(var(--i, 0) * 140ms + 0.3s); }
+    .wl-live { animation: wl-blink 1.2s steps(1, end) infinite; }
+  }
+  /* Clip only, so the brackets (outside the box) show once it is open */
+  @keyframes wl-open {
+    from { clip-path: inset(0 50% 0 50%); }
+    to { clip-path: inset(-12px); }
+  }
+  @keyframes wl-blink {
+    50% { opacity: 0.2; }
+  }
+</style>

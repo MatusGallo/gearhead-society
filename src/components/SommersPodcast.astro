@@ -1,0 +1,167 @@
+---
+/**
+ * Sommers podcast: copy and the producer's credit with socials on the left, the latest episode as a bracketed
+ * player plate on the right, and every earlier episode in a list that opens on request. A real episode's plate has
+ * a button that swaps it for the Spotify player, so nothing loads from Spotify before the click; with
+ * `sommers.podcast.demo` there is no player. The waveform is generated, not audio.
+ */
+import Icon from "./Icon.astro";
+import PodcastCover from "./PodcastCover.astro";
+import { formatRange, sommers } from "../data/sommers";
+import { translator, type Lang } from "../i18n";
+
+interface Props {
+  lang: Lang;
+}
+const { lang } = Astro.props;
+const t = translator(lang);
+const { demo, producer, episodes } = sommers.podcast;
+const [latest, ...older] = episodes;
+const total = episodes.length;
+const pad = (i: number) => String(total - i).padStart(2, "0");
+const num = (i: number) => `#${pad(i)}`;
+
+const id = !demo && latest?.url?.match(/episode\/([A-Za-z0-9]+)/)?.[1];
+const embed = id && `https://open.spotify.com/embed/episode/${id}?theme=0`;
+
+// Seeded bar heights, so every build draws the same waveform
+const bars = Array.from({ length: 48 }, (_, i) => {
+  const v = Math.abs(Math.sin(i * 0.9) * 0.55 + Math.sin(i * 0.23 + 1.3) * 0.35 + Math.sin(i * 2.7) * 0.1);
+  return Math.round(18 + v * 82);
+});
+---
+
+{
+  latest && (
+    <section id="podcast" class="scroll-mt-24 border-y border-line">
+      <div class="mx-auto grid max-w-[1400px] items-start gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_1.2fr]">
+        <div>
+          <p class="mono flex items-center gap-2 text-xs text-acid">
+            <Icon name="broadcast" class="size-4" />
+            {t({ cs: "Podcast", en: "Podcast" })}
+          </p>
+          <h2 class="display mt-4 text-[clamp(2.25rem,5vw,4rem)] !leading-[0.95]">{t({ cs: "Sommers na vlně", en: "Sommers on air" })}</h2>
+          <p class="mt-6 max-w-[46ch] leading-relaxed text-bone/80">
+            {t({ cs: "Poslouchej srazy i mezi nimi: rozhovory s lidmi z komunity, rady pro nováčky a všechno, co se na srazy nevešlo.", en: "Listen between the meetups too: talks with people from the community, tips for newcomers and everything that did not fit into a weekend." })}
+          </p>
+          <div class="mt-10 border-t border-line pt-6">
+            <p class="mono text-xs text-mute">{t({ cs: "Pro Sommers natáčí", en: "Made for Sommers by" })}</p>
+            <p class="display mt-2 text-2xl">{producer.name}</p>
+            <ul class="mt-4 flex flex-wrap gap-2">
+              {producer.socials.map((s) => (
+                <li>
+                  <a href={s.href} target="_blank" rel="noopener" class="btn btn-ghost min-h-11 px-4 text-sm" aria-label={`${producer.name}: ${s.label}`}>
+                    <Icon name={s.icon} class="size-5" /> <span class="mono text-xs">{s.label}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        <div>
+          <div class="frame frame-on relative bg-coal" data-podcast>
+            <div class="flex flex-col gap-6 p-6" data-podcast-plate>
+              <div class="mono flex items-center justify-between gap-4 text-xs text-mute">
+                <span>{t({ cs: "Nejnovější díl", en: "Latest episode" })} {num(0)}</span>
+                <span class="flex items-center gap-2 text-acid">
+                  <span class="size-2 bg-acid" aria-hidden="true" />
+                  {t({ cs: "Vysílá", en: "On air" })}
+                </span>
+              </div>
+              <div class="grid items-end gap-5 sm:grid-cols-[13rem_1fr]">
+                <PodcastCover src={latest.cover} number={pad(0)} sizes="(min-width: 640px) 13rem, 90vw" class="w-full max-w-[20rem]" />
+                <div>
+                  <h3 class="display text-2xl sm:text-3xl">{latest.title[lang]}</h3>
+                  <p class="mono mt-2 text-xs text-mute">{formatRange(latest.date, undefined, lang)} / {latest.length}</p>
+                </div>
+              </div>
+              <p class="max-w-[52ch] text-sm leading-relaxed text-bone/75">{latest.text[lang]}</p>
+              <div class="levels flex h-16 items-center gap-[3px]" aria-hidden="true">
+                {bars.map((h, j) => <span class="w-full bg-acid/80" style={`height:${h}%;--i:${j % 12}`} />)}
+              </div>
+              <div class="flex flex-wrap items-center gap-3">
+                {embed && (
+                  <button type="button" data-podcast-load data-src={embed} data-title={`${latest.title[lang]} (Spotify)`} class="btn btn-acid">
+                    {t({ cs: "Přehrát", en: "Play" })} <Icon name="play" />
+                  </button>
+                )}
+                {latest.url && (
+                  <a href={latest.url} target="_blank" rel="noopener" class:list={["btn", embed ? "btn-ghost" : "btn-acid"]}>
+                    {t({ cs: "Poslouchat na Spotify", en: "Listen on Spotify" })} <Icon name="spotify-logo" />
+                  </a>
+                )}
+              </div>
+              {embed && <p class="mono text-[0.7rem] text-mute">{t({ cs: "Přehrávač načítá Spotify, které ukládá vlastní cookies.", en: "The player loads from Spotify, which sets its own cookies." })}</p>}
+            </div>
+          </div>
+
+          {
+            older.length > 0 && (
+              <div class="mt-8" data-episodes>
+                <ol id="podcast-older" class="grid border-t border-line" hidden>
+                  {older.map((e, i) => (
+                    <li>
+                      <a href={e.url} target="_blank" rel="noopener" class="pod-row grid grid-cols-[4rem_1fr_auto] items-center gap-4 border-b border-line py-3 transition-colors duration-150">
+                        <PodcastCover src={e.cover} number={pad(i + 1)} sizes="4rem" compact />
+                        <span>
+                          <span class="block text-bone">{e.title[lang]}</span>
+                          <span class="mono text-[0.7rem] text-mute">{formatRange(e.date, undefined, lang)} / {e.length}</span>
+                        </span>
+                        <Icon name="spotify-logo" class="size-5 text-acid" />
+                      </a>
+                    </li>
+                  ))}
+                </ol>
+                <button type="button" data-episodes-toggle aria-expanded="false" aria-controls="podcast-older" class="mono mt-4 inline-flex min-h-11 items-center gap-3 text-sm text-acid">
+                  <Icon name="plus" class="pod-plus size-4" />
+                  <span class="pod-show">{t({ cs: "Zobrazit všechny díly", en: "Show all episodes" })} ({total})</span>
+                  <span class="pod-hide">{t({ cs: "Skrýt starší díly", en: "Hide older episodes" })}</span>
+                </button>
+              </div>
+            )
+          }
+        </div>
+      </div>
+    </section>
+  )
+}
+
+<style>
+  .pod-hide,
+  [aria-expanded="true"] .pod-show { display: none; }
+  [aria-expanded="true"] .pod-hide { display: inline; }
+  .pod-plus { transition: transform 140ms ease-out; }
+  [aria-expanded="true"] .pod-plus { transform: rotate(45deg); }
+  @media (hover: hover) and (pointer: fine) {
+    .pod-row:hover { background: var(--color-steel); }
+    [data-episodes-toggle]:hover { color: var(--color-bone); }
+  }
+</style>
+
+<script>
+  // Earlier episodes open and close in place, instantly, so repeated toggling never replays anything
+  for (const root of document.querySelectorAll<HTMLElement>("[data-episodes]")) {
+    const toggle = root.querySelector<HTMLButtonElement>("[data-episodes-toggle]");
+    const list = root.querySelector<HTMLElement>("#podcast-older");
+    toggle?.addEventListener("click", () => {
+      const open = toggle.getAttribute("aria-expanded") !== "true";
+      toggle.setAttribute("aria-expanded", String(open));
+      if (list) list.hidden = !open;
+    });
+  }
+  // Swaps the plate for the Spotify player on request; Spotify is never contacted before the click
+  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-podcast-load]")) {
+    button.addEventListener("click", () => {
+      const frame = document.createElement("iframe");
+      frame.src = button.dataset.src!;
+      frame.title = button.dataset.title!;
+      frame.width = "100%";
+      frame.height = "232";
+      frame.allow = "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture";
+      frame.className = "block border-0";
+      button.closest("[data-podcast-plate]")?.replaceWith(frame);
+      frame.focus();
+    });
+  }
+</script>

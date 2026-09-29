@@ -71,7 +71,7 @@ const placed = labels.map((text, i) => ({
   aria-label={label}
   aria-hidden={label ? undefined : "true"}
 >
-  <div class:list={["scan-stage absolute inset-0", tilt && "scan-tilt", tilt && steer && "scan-steer"]}>
+  <div class:list={["scan-stage absolute inset-0", tilt && "scan-tilt", tilt && steer && "scan-steer"]} data-pointer-vars={tilt && steer ? "" : undefined}>
     <div class:list={["scan-cam absolute inset-0", animate && tilt && "scan-drift"]}>
       <canvas class="scan-canvas absolute inset-0 size-full"></canvas>
       {animate && <canvas class="scan-canvas absolute inset-0 size-full"></canvas>}

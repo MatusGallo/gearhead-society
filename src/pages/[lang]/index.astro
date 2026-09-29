@@ -16,7 +16,7 @@ import HeroOpsMap from "../../components/HeroOpsMap.astro";
 import Visual from "../../components/Visual.astro";
 import { formatDate, formatNumeric, formatPrice, formatTime, nextEvent, ticketWaves, upcomingEvents } from "../../data/events";
 import { galleries } from "../../data/galleries";
-import { ph, placeholder } from "../../data/placeholder";
+import { ph } from "../../data/placeholder";
 import { site } from "../../data/site";
 import { dissolve } from "../../data/dissolve";
 import { href, langPaths, translator, ui, type Lang } from "../../i18n";
@@ -31,7 +31,7 @@ const latest = galleries.slice(0, 4);
 const zones = ui.zones[lang];
 // The night as a route: door, cloakroom, floor, bar, chill
 const route = [4, 1, 0, 2, 3].map((i) => zones[i]);
-const heroPhoto = placeholder("smoke-room");
+const heroPhoto = ph("smoke-room");
 // Ops map for the hero cycle: only when the venue has a published address (real data only)
 const loc = next?.location;
 const opsMap =
@@ -87,7 +87,7 @@ const readout = next
     <div class="relative order-2 flex min-h-[82dvh] flex-col sm:min-h-[75dvh] justify-end overflow-hidden lg:order-1 lg:min-h-0" data-pointer data-cycle={opsMap ? "" : undefined}>
       <!-- Live-feed read of the photo: tracking boxes lock onto the helmet and the gear -->
       <div class="hero-tri absolute inset-0" data-cycle-photo>
-      <HeroPlate src={heroPhoto.src} focus="50% 6%" focusMobile="86% 0%" scanlines={false} ratio={heroPhoto.width / heroPhoto.height}>
+      <HeroPlate src={heroPhoto} focus="50% 6%" focusMobile="86% 0%" scanlines={false} ratio={heroPhoto.width / heroPhoto.height}>
         {
           next && (
             <>
@@ -237,7 +237,7 @@ const readout = next
         {
           nightTiles.map((tile, i) => (
             <div class="w-[72vw] shrink-0 snap-start sm:w-80 lg:w-auto">
-              <Visual src={tile.photo} alt="" tone={i === 0 ? "violet" : "mono"} fx={["grain"]} imgClass="settle" class="aspect-square">
+              <Visual src={tile.photo} sizes="(min-width: 1024px) 25vw, 80vw" alt="" tone={i === 0 ? "violet" : "mono"} fx={["grain"]} imgClass="settle" class="aspect-square">
                 <span class="chip absolute top-0 left-0"><Icon name={tile.icon} class="size-3.5" /> {tile.tag}</span>
               </Visual>
               <div class:list={["flex items-center justify-between gap-3 px-4 py-4", i === 0 ? "bg-violet text-bone" : "bg-steel"]}>
@@ -276,7 +276,7 @@ const readout = next
         <a href={href(lang, "/about")} class="btn btn-slab mt-10">{t({ cs: "Náš příběh", en: "Our story" })} <Icon name="arrow-right" /></a>
       </div>
       <div class="frame frame-on self-start">
-        <Visual src={ph("harness")} alt={t({ cs: "Horolezecký postroj s karabinami na maskáčích", en: "A climbing harness with carabiners over camo" })} tone="mono" fx={["dots"]} imgClass="parallax" class="aspect-[16/11]" />
+        <Visual src={ph("harness")} sizes="(min-width: 1024px) 50vw, 100vw" alt={t({ cs: "Horolezecký postroj s karabinami na maskáčích", en: "A climbing harness with carabiners over camo" })} tone="mono" fx={["dots"]} imgClass="parallax" class="aspect-[16/11]" />
       </div>
     </div>
   </section>

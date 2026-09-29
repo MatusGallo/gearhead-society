@@ -1,24 +1,21 @@
 ---
-import Mark from "../assets/mark.svg";
+import { Image } from "astro:assets";
+import emblem from "../assets/brand/emblem.png";
+import mark from "../assets/brand/mark.png";
 
 interface Props {
   class?: string;
-  /** Only the hex nut harness mark, without the wordmark */
+  /** Only the gas-mask head, for tight spots like the header */
   markOnly?: boolean;
 }
 const { class: cls = "", markOnly = false } = Astro.props;
 ---
 
-<!-- Hex nut with a harness (crossed straps, O-ring); takes the text colour (acid by default) -->
-<span class:list={["inline-flex items-center gap-3", cls]}>
-  <Mark class="shrink-0 text-acid" width={markOnly ? 40 : 44} height={markOnly ? 40 : 44} aria-hidden="true" />
-  {
-    !markOnly && (
-      <span class="display text-[0.95rem] !leading-[1] tracking-normal">
-        Gearhead
-        <br />
-        <span class="text-acid">Society</span>
-      </span>
-    )
-  }
-</span>
+<!-- Operator in a cog: the full emblem carries the wordmark, the head alone is the small mark -->
+{
+  markOnly ? (
+    <Image src={mark} alt="" width={44} height={44} densities={[1, 2, 3]} class:list={["size-11 shrink-0", cls]} />
+  ) : (
+    <Image src={emblem} alt="Gearhead Society" width={112} densities={[1, 2, 3]} class:list={["h-auto w-28 shrink-0", cls]} />
+  )
+}

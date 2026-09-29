@@ -183,8 +183,10 @@ const status = { moving: t({ cs: "Zaměřuji", en: "Acquiring" }), locked: t({ c
     white-space: nowrap;
     pointer-events: none;
     opacity: 0;
+    /* Position rides on translate (set by the script), centring on transform: no layout per frame */
+    translate: var(--tx, 0) var(--ty, 0);
     transform: translate(-50%, calc(-100% - 10px));
-    transition: left 0.4s var(--ease-out-expo), top 0.4s var(--ease-out-expo), opacity 0.3s;
+    transition: translate 0.25s var(--ease-out-expo), opacity 0.2s var(--ease-out-expo);
   }
   .addr-tip::after {
     content: "";
@@ -390,8 +392,8 @@ const status = { moving: t({ cs: "Zaměřuji", en: "Acquiring" }), locked: t({ c
       if (!r) return;
       const half = tip.offsetWidth / 2;
       const x = Math.min(Math.max(r.left + r.width / 2 - box.left, half), box.width - half);
-      tip.style.left = `${x}px`;
-      tip.style.top = `${r.top - box.top}px`;
+      tip.style.setProperty("--tx", `${x}px`);
+      tip.style.setProperty("--ty", `${r.top - box.top}px`);
       tip.textContent = active.querySelector(".part-label")!.textContent;
       tip.setAttribute("data-on", "");
     };
